@@ -1,0 +1,23 @@
+service: {{.ProjectName}}
+
+provider:
+  name: kronos
+  environment: dev
+  exchange: binance
+
+backtest:
+  engine: local
+  data:
+    pair: BTC-USDT
+    timeframe: 1h
+    start: "2024-01-01"
+    end: "2024-12-31"
+  capital: 10000
+
+execution:
+  mode: backtest
+
+strategies:
+  - name: example
+    enabled: true
+    path: ./strategies/example
