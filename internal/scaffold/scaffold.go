@@ -24,8 +24,9 @@ func NewScaffolder() *Scaffolder {
 }
 
 type ProjectData struct {
-	ProjectName string
-	ModulePath  string
+	ProjectName     string
+	ModulePath      string
+	StrategyPackage string
 }
 
 func (s *Scaffolder) CreateProject(name string) error {
@@ -38,8 +39,9 @@ func (s *Scaffolder) CreateProject(name string) error {
 	}
 
 	data := ProjectData{
-		ProjectName: name,
-		ModulePath:  "github.com/your-username/" + name,
+		ProjectName:     name,
+		ModulePath:      "github.com/your-username/" + name,
+		StrategyPackage: "example",
 	}
 
 	// Create structure
