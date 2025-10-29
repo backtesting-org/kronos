@@ -1,0 +1,52 @@
+package example
+
+import (
+    "time"
+
+    "github.com/backtesting-org/kronos-sdk/pkg/types/connector"
+    "github.com/backtesting-org/kronos-sdk/pkg/types/logging"
+    "github.com/backtesting-org/kronos-sdk/pkg/types/portfolio"
+    "github.com/backtesting-org/kronos-sdk/pkg/types/portfolio/store"
+    "github.com/backtesting-org/kronos-sdk/pkg/types/strategy"
+    "github.com/google/uuid"
+    "github.com/shopspring/decimal"
+)
+
+type ExampleStrategy struct {
+    *strategy.BaseStrategy
+    assetStore store.Store
+    logger     logging.ApplicationLogger
+}
+
+func NewExampleStrategy(
+    assetStore store.Store,
+    logger logging.ApplicationLogger,
+) *ExampleStrategy {
+    return &ExampleStrategy{
+        assetStore: assetStore,
+        logger:     logger,
+    }
+}
+
+func (s *ExampleStrategy) GetSignals() ([]*strategy.Signal, error) {
+    // TODO: Implement your strategy logic
+    return nil, nil
+}
+
+func (s *ExampleStrategy) GetName() strategy.StrategyName {
+    return strategy.StrategyName("example")
+}
+
+func (s *ExampleStrategy) GetDescription() string {
+    return "Example strategy for {{.ProjectName}}"
+}
+
+func (s *ExampleStrategy) GetRiskLevel() strategy.RiskLevel {
+    return strategy.RiskLevelMedium
+}
+
+func (s *ExampleStrategy) GetStrategyType() strategy.StrategyType {
+    return strategy.StrategyType("example")
+}
+
+var _ strategy.Strategy = (*ExampleStrategy)(nil)

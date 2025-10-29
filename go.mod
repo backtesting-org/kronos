@@ -3,6 +3,7 @@ module github.com/backtesting-org/kronos-cli
 go 1.24.2
 
 require (
+	github.com/backtesting-org/kronos-sdk v0.0.0-20251024085124-bdf28e0a8bc9 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
@@ -23,7 +24,7 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/fx v1.24.0 // indirect
-	go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/sys v0.29.0 // indirect
