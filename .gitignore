@@ -3,10 +3,12 @@
 *.dll
 *.so
 *.dylib
+kronos
 
 # Output directories
 bin/
 build/
+results/
 
 # Vendor directory (if using vendoring)
 vendor/
