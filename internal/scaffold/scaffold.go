@@ -1,17 +1,14 @@
 package scaffold
 
 import (
-	"embed"
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
-	"text/template"
 
 	"github.com/fatih/color"
 	"github.com/spf13/afero"
 )
-
-//go:embed templates/*
-var templateFS embed.FS
 
 type Scaffolder struct {
 	fs afero.Fs
@@ -44,12 +41,7 @@ func (s *Scaffolder) CreateProject(name string) error {
 		StrategyPackage: "example",
 	}
 
-	// Create structure
-	if err := s.createDirs(name); err != nil {
-		return err
-	}
-
-	// Generate files
+	// Generate files (git clone will create the directory)
 	if err := s.generateFiles(name, data); err != nil {
 		return err
 	}
@@ -58,51 +50,50 @@ func (s *Scaffolder) CreateProject(name string) error {
 	return nil
 }
 
-func (s *Scaffolder) createDirs(name string) error {
-	dirs := []string{
-		name,
-		filepath.Join(name, "strategies", "example"),
-	}
-
-	for _, dir := range dirs {
-		if err := s.fs.MkdirAll(dir, 0755); err != nil {
-			return err
-		}
-		fmt.Printf("  📁 %s\n", dir)
-	}
-	return nil
-}
-
 func (s *Scaffolder) generateFiles(name string, data ProjectData) error {
-	files := map[string]string{
-		"kronos.yml.tmpl":  "kronos.yml",
-		"strategy.go.tmpl": "strategies/example/strategy.go",
-		"go.mod.tmpl":      "go.mod",
-		"gitignore.tmpl":   ".gitignore",
-		"README.md.tmpl":   "README.md",
+	// Git clone with sparse checkout directly to project directory
+	fmt.Println("  📦 Downloading cash_carry example from GitHub...")
+
+	cmd := exec.Command("git", "clone", "--depth", "1", "--filter=blob:none", "--sparse",
+		"https://github.com/backtesting-org/kronos-sdk.git", name)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to clone SDK: %w", err)
 	}
 
-	tmpl := template.Must(template.ParseFS(templateFS, "templates/*.tmpl"))
+	// Set sparse checkout to get ONLY cash_carry
+	cmd = exec.Command("git", "-C", name, "sparse-checkout", "set", "examples/cash_carry")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to checkout cash_carry: %w", err)
+	}
 
-	for src, dst := range files {
-		dstPath := filepath.Join(name, dst)
-		if err := s.renderTemplate(tmpl, src, dstPath, data); err != nil {
-			return err
+	// Move everything from examples/cash_carry to root
+	cashCarryDir := filepath.Join(name, "examples", "cash_carry")
+	files, err := os.ReadDir(cashCarryDir)
+	if err != nil {
+		return fmt.Errorf("failed to read cash_carry directory: %w", err)
+	}
+
+	for _, file := range files {
+		srcPath := filepath.Join(cashCarryDir, file.Name())
+		dstPath := filepath.Join(name, file.Name())
+
+		if err := os.Rename(srcPath, dstPath); err != nil {
+			return fmt.Errorf("failed to move %s: %w", file.Name(), err)
 		}
-		fmt.Printf("  📝 %s\n", dstPath)
+		fmt.Printf("  📝 %s\n", file.Name())
+	}
+
+	// Remove examples directory
+	if err := os.RemoveAll(filepath.Join(name, "examples")); err != nil {
+		return fmt.Errorf("failed to remove examples directory: %w", err)
+	}
+
+	// Remove .git directory
+	if err := os.RemoveAll(filepath.Join(name, ".git")); err != nil {
+		return fmt.Errorf("failed to remove .git directory: %w", err)
 	}
 
 	return nil
-}
-
-func (s *Scaffolder) renderTemplate(tmpl *template.Template, name, path string, data ProjectData) error {
-	file, err := s.fs.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	return tmpl.ExecuteTemplate(file, name, data)
 }
 
 func (s *Scaffolder) printSuccess(name string) {
@@ -112,5 +103,5 @@ func (s *Scaffolder) printSuccess(name string) {
 	fmt.Printf("Next steps:\n")
 	fmt.Printf("  %s\n", blue.Sprint("cd "+name))
 	fmt.Printf("  %s\n", blue.Sprint("go mod tidy"))
-	fmt.Printf("  %s\n", blue.Sprint("# Edit strategies/example/strategy.go"))
+	fmt.Printf("  %s\n", blue.Sprint("go run strategy.go"))
 }

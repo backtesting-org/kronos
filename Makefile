@@ -9,8 +9,9 @@ build:
 # Install the CLI to $GOPATH/bin
 install:
 	@echo "📦 Installing Kronos CLI..."
-	@go install .
+	@go build -o $(shell go env GOPATH)/bin/kronos .
 	@echo "✅ Installed to $(shell go env GOPATH)/bin/kronos"
+	@echo "💡 Run 'kronos --help' to get started"
 
 # Run tests
 test:
@@ -24,10 +25,15 @@ clean:
 	@rm -rf dist/
 	@echo "✅ Clean complete"
 
-# Run init command
+# Run init command with project name (usage: make run-init PROJECT=my-project)
 run-init: build
-	@echo "🚀 Running kronos init..."
-	@./kronos init
+	@if [ -z "$(PROJECT)" ]; then \
+		echo "❌ Error: PROJECT is required"; \
+		echo "Usage: make run-init PROJECT=my-project"; \
+		exit 1; \
+	fi
+	@echo "🚀 Running kronos init $(PROJECT)..."
+	@./kronos init $(PROJECT)
 
 # Run backtest command
 run-backtest: build
@@ -70,7 +76,7 @@ help:
 	@echo "  install            Install to \$$GOPATH/bin"
 	@echo "  test               Run tests"
 	@echo "  clean              Clean build artifacts"
-	@echo "  run-init           Run kronos init"
+	@echo "  run-init           Run kronos init (usage: make run-init PROJECT=my-project)"
 	@echo "  run-backtest       Run kronos backtest"
 	@echo "  run-interactive    Run kronos backtest --interactive"
 	@echo "  run-dry            Run kronos backtest --dry-run"
