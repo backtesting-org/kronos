@@ -20,7 +20,7 @@ Use Kronos to:
   • Analyze results
 
 Examples:
-  kronos init                    Create kronos.yml
+  kronos init my-project         Create a new project
   kronos backtest                Run backtest
   kronos backtest --interactive  Interactive mode
   kronos analyze                 Analyze results`,
