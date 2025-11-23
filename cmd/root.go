@@ -165,7 +165,7 @@ func runMainMenu(rootCmd *cobra.Command) error {
 	}
 
 	result := finalModel.(mainMenuModel)
-	
+
 	// If user quit without selecting, just exit
 	if result.selected == "" {
 		return nil
@@ -181,60 +181,14 @@ func runMainMenu(rootCmd *cobra.Command) error {
 	case "Analyze Results":
 		return runAnalyze(analyzeCmd, []string{})
 	case "Create New Project":
-		fmt.Println("\n💡 Usage: kronos init <project-name>")
-		fmt.Println("Example: kronos init my-trading-bot")
-		return nil
-	case "Show Help":
-		return rootCmd.Help()
-	}
-
-	return nil
-}
-
-// runSimpleMainMenu is a fallback for environments without TTY (like IDEs)
-func runSimpleMainMenu(rootCmd *cobra.Command, choices []string) error {
-	fmt.Println("\n🚀 KRONOS CLI v" + version)
-	fmt.Println("===============")
-	fmt.Println()
-	fmt.Println("What would you like to do?")
-	fmt.Println()
-
-	icons := []string{"🚀", "📊", "📈", "🆕", "ℹ️"}
-	for i, choice := range choices {
-		fmt.Printf("  [%d] %s %s\n", i+1, icons[i], choice)
-	}
-
-	fmt.Print("\nEnter selection (1-5) or 'q' to quit: ")
-
-	var input string
-	fmt.Scanln(&input)
-
-	if input == "q" || input == "Q" {
-		return nil
-	}
-
-	var selection int
-	_, err := fmt.Sscanf(input, "%d", &selection)
-	if err != nil || selection < 1 || selection > len(choices) {
-		fmt.Println("Invalid selection")
-		return nil
-	}
-
-	selected := choices[selection-1]
-
-	// Route to appropriate command
-	switch selected {
-	case "Start Live Trading":
-		return runLive(liveCmd, []string{})
-	case "Run Backtest":
-		interactiveMode = true
-		return runBacktest(backtestCmd, []string{})
-	case "Analyze Results":
-		return runAnalyze(analyzeCmd, []string{})
-	case "Create New Project":
-		fmt.Println("\n💡 Usage: kronos init <project-name>")
-		fmt.Println("Example: kronos init my-trading-bot")
-		return nil
+		fmt.Print("\nEnter project name: ")
+		var projectName string
+		fmt.Scanln(&projectName)
+		if projectName == "" {
+			fmt.Println("Project name required")
+			return nil
+		}
+		return runInit(initCmd, []string{projectName})
 	case "Show Help":
 		return rootCmd.Help()
 	}
