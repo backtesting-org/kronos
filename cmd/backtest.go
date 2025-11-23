@@ -29,12 +29,18 @@ var backtestCmd = &cobra.Command{
 	Short: "Run a backtest simulation",
 	Long: `Run a backtest simulation of your trading strategy.
 	
+By default, opens interactive mode if no config is specified.
+Use --non-interactive to force config file execution.
+
 Examples:
-  # Run with default config
+  # Interactive mode (default if no config)
   kronos backtest
   
-  # Interactive mode
-  kronos backtest --interactive
+  # Run with config file
+  kronos backtest --config kronos.yml
+  
+  # Non-interactive with config
+  kronos backtest --non-interactive --config kronos.yml
   
   # Dry run (preview what would run)
   kronos backtest --dry-run
@@ -49,7 +55,7 @@ func init() {
 	backtestCmd.Flags().StringVar(&outputFormat, "output", "text", "Output format: text|json")
 	backtestCmd.Flags().BoolVar(&watch, "watch", false, "Watch config file and re-run on changes")
 	backtestCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would run without executing")
-	backtestCmd.Flags().BoolVar(&interactiveMode, "interactive", false, "Interactive mode (guided setup)")
+	backtestCmd.Flags().BoolVar(&interactiveMode, "interactive", false, "Force interactive mode (guided setup)")
 	backtestCmd.Flags().BoolVar(&verbose, "verbose", false, "Verbose logging")
 }
 
@@ -58,45 +64,63 @@ func runBacktest(cmd *cobra.Command, args []string) error {
 		return runWatchMode()
 	}
 
+	// If interactive flag is set OR (no config file exists AND not non-interactive mode)
+	if interactiveMode || (!config.FileExists(configPath) && !nonInteractive) {
+		return executeInteractiveBacktest()
+	}
+
 	return executeBacktest()
+}
+
+func executeInteractiveBacktest() error {
+	cfg, err := interactive.InteractiveMode()
+	if err != nil {
+		return err
+	}
+
+	// Run backtest with interactive config
+	results, err := runBacktestSimulation(cfg)
+	if err != nil {
+		ui.Error(fmt.Sprintf("Backtest failed: %v", err))
+		return err
+	}
+
+	if outputFormat == "json" {
+		return displayResultsJSON(results)
+	}
+
+	ui.DisplayResults(results)
+	return nil
 }
 
 func executeBacktest() error {
 	var cfg *config.Config
 	var err error
 
-	// Interactive mode
-	if interactiveMode {
-		cfg, err = interactive.InteractiveMode()
-		if err != nil {
-			return err
-		}
-	} else {
-		// Load config from file
-		if !config.FileExists(configPath) {
-			ui.DisplayError(
-				"Config file not found",
-				fmt.Sprintf("kronos.yml does not exist in current directory"),
-				[]string{
-					"Run: kronos init",
-					"Or specify config path: kronos backtest --config path/to/config.yml",
-				},
-			)
-			return fmt.Errorf("config file not found: %s", configPath)
-		}
+	// Load config from file
+	if !config.FileExists(configPath) {
+		ui.DisplayError(
+			"Config file not found",
+			fmt.Sprintf("kronos.yml does not exist in current directory"),
+			[]string{
+				"Run: kronos init",
+				"Or specify config path: kronos backtest --config path/to/config.yml",
+			},
+		)
+		return fmt.Errorf("config file not found: %s", configPath)
+	}
 
-		cfg, err = config.LoadConfig(configPath)
-		if err != nil {
-			ui.DisplayError(
-				"Failed to load config",
-				err.Error(),
-				[]string{
-					"Check your YAML syntax",
-					"See example: https://kronos.io/docs/config",
-				},
-			)
-			return err
-		}
+	cfg, err = config.LoadConfig(configPath)
+	if err != nil {
+		ui.DisplayError(
+			"Failed to load config",
+			err.Error(),
+			[]string{
+				"Check your YAML syntax",
+				"See example: https://kronos.io/docs/config",
+			},
+		)
+		return err
 	}
 
 	// Validate config

@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/backtesting-org/kronos-cli/internal/live"
 	"github.com/spf13/cobra"
 )
 
@@ -12,40 +12,59 @@ var liveCmd = &cobra.Command{
 	Short: "Start live trading",
 	Long: `Start live trading with your strategy.
 	
+By default, opens an interactive TUI to select and deploy your strategy.
+Use --non-interactive flag for direct execution.
+
 Examples:
-  # Start live trading with config
+  # Interactive strategy selector (default)
   kronos live
   
-  # Dry-run mode (paper trading)
-  kronos live --dry-run
+  # Direct execution (for scripts/CI)
+  kronos live --non-interactive --strategy momentum --exchange paradex
   
-  # Start with custom config
-  kronos live --config production.yml`,
+  # Paper trading mode
+  kronos live --dry-run`,
 	RunE: runLive,
 }
 
-var liveDryRun bool
+var (
+	liveStrategy string
+	liveExchange string
+	liveDryRun   bool
+)
 
 func init() {
-	liveCmd.Flags().StringVar(&configPath, "config", "kronos.yml", "Path to config file")
+	liveCmd.Flags().StringVar(&liveStrategy, "strategy", "", "Specific strategy to deploy (requires --non-interactive)")
+	liveCmd.Flags().StringVar(&liveExchange, "exchange", "", "Exchange to use (requires --non-interactive)")
 	liveCmd.Flags().BoolVar(&liveDryRun, "dry-run", false, "Paper trading mode (no real orders)")
 }
 
 func runLive(cmd *cobra.Command, args []string) error {
-	ui.ShowBanner()
-	ui.Warning("Live trading feature coming soon!")
-	fmt.Println()
-	
-	ui.Info("This will include:")
-	fmt.Println("  • Real-time strategy execution")
-	fmt.Println("  • Exchange API integration")
-	fmt.Println("  • Risk management controls")
-	fmt.Println("  • Real-time P&L tracking")
-	fmt.Println("  • Paper trading mode")
-	fmt.Println()
-	
-	ui.Warning("⚠️  Live trading involves real money. Use with caution!")
-	
+	// Check if non-interactive mode
+	if nonInteractive {
+		// Validate required flags
+		if liveStrategy == "" || liveExchange == "" {
+			return fmt.Errorf("--strategy and --exchange are required in non-interactive mode")
+		}
+
+		// Direct execution
+		fmt.Printf("🚀 Starting %s strategy on %s...\n", liveStrategy, liveExchange)
+		if liveDryRun {
+			fmt.Println("📝 Mode: PAPER TRADING")
+		} else {
+			fmt.Println("🔴 Mode: LIVE TRADING")
+		}
+
+		// TODO: Execute live-trading binary with params
+		fmt.Printf("\nCommand: live-trading --exchange %s --strategy ./strategies/%s/strategy.so\n",
+			liveExchange, liveStrategy)
+
+		return nil
+	}
+
+	// Launch the interactive TUI
+	if err := live.RunSelectionTUI(); err != nil {
+		return fmt.Errorf("failed to run TUI: %w", err)
+	}
 	return nil
 }
-
