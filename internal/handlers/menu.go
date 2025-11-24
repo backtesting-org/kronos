@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"fmt"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -91,30 +89,12 @@ func (m mainMenuModel) View() string {
 }
 
 func (h *RootHandler) handleCreateProject(cmd *cobra.Command) error {
-	// Build a styled input prompt
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#00D9FF"))
-
-	promptStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#D1D5DB"))
-
-	mutedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		Italic(true)
-
-	fmt.Println()
-	fmt.Println(titleStyle.Render("🆕 CREATE NEW PROJECT"))
-	fmt.Println()
-	fmt.Print(promptStyle.Render("Project name: "))
-
-	var projectName string
-	fmt.Scanln(&projectName)
-
-	if projectName == "" {
-		fmt.Println(mutedStyle.Render("✗ Project name required"))
-		return nil
+	// Run the init TUI flow
+	strategyExample, projectName, err := RunInitTUI()
+	if err != nil {
+		return err
 	}
 
-	return h.initHandler.Handle(cmd, []string{projectName})
+	// Create the project with the selected strategy
+	return h.initHandler.HandleWithStrategy(strategyExample, projectName)
 }

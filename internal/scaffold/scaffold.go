@@ -27,6 +27,10 @@ type ProjectData struct {
 }
 
 func (s *Scaffolder) CreateProject(name string) error {
+	return s.CreateProjectWithStrategy(name, "mean_reversion")
+}
+
+func (s *Scaffolder) CreateProjectWithStrategy(name, strategyExample string) error {
 	green := color.New(color.FgGreen, color.Bold)
 	fmt.Printf("🚀 Creating Kronos project: %s\n\n", green.Sprint(name))
 
@@ -38,11 +42,11 @@ func (s *Scaffolder) CreateProject(name string) error {
 	data := ProjectData{
 		ProjectName:     name,
 		ModulePath:      "github.com/your-username/" + name,
-		StrategyPackage: "example",
+		StrategyPackage: strategyExample,
 	}
 
 	// Generate files (git clone will create the directory)
-	if err := s.generateFiles(name, data); err != nil {
+	if err := s.generateFiles(name, strategyExample, data); err != nil {
 		return err
 	}
 
@@ -50,9 +54,9 @@ func (s *Scaffolder) CreateProject(name string) error {
 	return nil
 }
 
-func (s *Scaffolder) generateFiles(name string, data ProjectData) error {
+func (s *Scaffolder) generateFiles(name, strategyExample string, data ProjectData) error {
 	// Git clone with sparse checkout directly to project directory
-	fmt.Println("  📦 Downloading cash_carry example from GitHub...")
+	fmt.Printf("  📦 Downloading %s example from GitHub...\n", strategyExample)
 
 	cmd := exec.Command("git", "clone", "--depth", "1", "--filter=blob:none", "--sparse",
 		"https://github.com/backtesting-org/kronos-sdk.git", name)
@@ -60,21 +64,22 @@ func (s *Scaffolder) generateFiles(name string, data ProjectData) error {
 		return fmt.Errorf("failed to clone SDK: %w", err)
 	}
 
-	// Set sparse checkout to get ONLY cash_carry
-	cmd = exec.Command("git", "-C", name, "sparse-checkout", "set", "examples/cash_carry")
+	// Set sparse checkout to get ONLY the selected example
+	examplePath := fmt.Sprintf("examples/%s", strategyExample)
+	cmd = exec.Command("git", "-C", name, "sparse-checkout", "set", examplePath)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to checkout cash_carry: %w", err)
+		return fmt.Errorf("failed to checkout %s: %w", strategyExample, err)
 	}
 
-	// Move everything from examples/cash_carry to root
-	cashCarryDir := filepath.Join(name, "examples", "cash_carry")
-	files, err := os.ReadDir(cashCarryDir)
+	// Move everything from examples/{strategy} to root
+	strategyDir := filepath.Join(name, "examples", strategyExample)
+	files, err := os.ReadDir(strategyDir)
 	if err != nil {
-		return fmt.Errorf("failed to read cash_carry directory: %w", err)
+		return fmt.Errorf("failed to read %s directory: %w", strategyExample, err)
 	}
 
 	for _, file := range files {
-		srcPath := filepath.Join(cashCarryDir, file.Name())
+		srcPath := filepath.Join(strategyDir, file.Name())
 		dstPath := filepath.Join(name, file.Name())
 
 		if err := os.Rename(srcPath, dstPath); err != nil {
@@ -93,6 +98,116 @@ func (s *Scaffolder) generateFiles(name string, data ProjectData) error {
 		return fmt.Errorf("failed to remove .git directory: %w", err)
 	}
 
+	// Generate configuration files
+	if err := s.generateConfigFiles(name, strategyExample); err != nil {
+		return fmt.Errorf("failed to generate config files: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Scaffolder) generateConfigFiles(name, strategyExample string) error {
+	// Check if config exists in the downloaded files
+	configPath := filepath.Join(name, "config.yml")
+	strategyPath := filepath.Join(name, "strategy.yml")
+
+	hasConfig := false
+	if _, err := os.Stat(configPath); err == nil {
+		hasConfig = true
+	}
+	if _, err := os.Stat(strategyPath); err == nil {
+		hasConfig = true
+	}
+
+	// If no config exists, generate a template with metadata structure
+	if !hasConfig {
+		configYAML := fmt.Sprintf(`# Strategy Metadata
+name: %s
+display_name: "%s Strategy"
+description: "Strategy based on %s example"
+type: %s
+icon: "🎯"
+
+# Strategy Configuration
+exchanges:
+  - binance
+  - bybit
+
+assets:
+  binance:
+    - BTC/USDT
+    - ETH/USDT
+  bybit:
+    - BTC/USDT
+
+parameters:
+  timeframe: 1h
+  # Add strategy-specific parameters here
+
+risk:
+  max_position_size: 1000
+  stop_loss_percent: 2.0
+  take_profit_percent: 5.0
+`, name, name, strategyExample, strategyExample)
+
+		if err := os.WriteFile(configPath, []byte(configYAML), 0644); err != nil {
+			return fmt.Errorf("failed to write config.yml: %w", err)
+		}
+		fmt.Printf("  📝 config.yml\n")
+	}
+
+	// Generate exchanges.yml
+	exchangesYAML := `exchanges:
+  - name: binance
+    enabled: true
+    credentials:
+      api_key: ""
+      api_secret: ""
+
+  - name: bybit
+    enabled: true
+    credentials:
+      api_key: ""
+      api_secret: ""
+
+  - name: paradex
+    enabled: false
+    credentials:
+      account_address: ""
+      eth_private_key: ""
+`
+
+	exchangesPath := filepath.Join(name, "exchanges.yml")
+	if err := os.WriteFile(exchangesPath, []byte(exchangesYAML), 0644); err != nil {
+		return fmt.Errorf("failed to write exchanges.yml: %w", err)
+	}
+	fmt.Printf("  📝 exchanges.yml\n")
+
+	// Generate .gitignore if it doesn't exist
+	gitignorePath := filepath.Join(name, ".gitignore")
+	if _, err := os.Stat(gitignorePath); os.IsNotExist(err) {
+		gitignoreContent := `# Credentials
+exchanges.yml
+
+# Build artifacts
+*.so
+bin/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+`
+		if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644); err != nil {
+			return fmt.Errorf("failed to write .gitignore: %w", err)
+		}
+		fmt.Printf("  📝 .gitignore\n")
+	}
+
 	return nil
 }
 
@@ -104,4 +219,7 @@ func (s *Scaffolder) printSuccess(name string) {
 	fmt.Printf("  %s\n", blue.Sprint("cd "+name))
 	fmt.Printf("  %s\n", blue.Sprint("go mod tidy"))
 	fmt.Printf("  %s\n", blue.Sprint("go run strategy.go"))
+	fmt.Printf("\n")
+	fmt.Printf("📝 Important:\n")
+	fmt.Printf("  • exchanges.yml - Add your API credentials\n")
 }
