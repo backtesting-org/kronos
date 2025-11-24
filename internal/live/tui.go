@@ -2,6 +2,7 @@ package live
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,6 +14,8 @@ type Screen int
 
 const (
 	ScreenSelection Screen = iota
+	ScreenExchangeSelection
+	ScreenCredentials
 	ScreenConfirmation
 	ScreenDeploying
 	ScreenSuccess
@@ -25,15 +28,25 @@ const (
 
 // SelectionModel is the Bubble Tea model for strategy selection
 type SelectionModel struct {
-	strategies    []Strategy
-	cursor        int
-	scrollOffset  int
-	selected      *Strategy
-	currentScreen Screen
-	confirmInput  string
-	width         int
-	height        int
-	err           error
+	strategies         []Strategy
+	cursor             int
+	scrollOffset       int
+	selected           *Strategy
+	selectedExchange   *ExchangeConfig
+	currentScreen      Screen
+	confirmInput       string
+	width              int
+	height             int
+	err                error
+
+	// Exchange selection
+	exchangeCursor     int
+
+	// Credential input fields
+	credentialFields   []string
+	currentField       int
+	fieldInputs        map[string]string
+	showPassword       bool
 }
 
 // NewSelectionModel creates a new strategy selection model
@@ -44,6 +57,7 @@ func NewSelectionModel(strategies []Strategy) SelectionModel {
 		currentScreen: ScreenSelection,
 		width:         80,
 		height:        24,
+		fieldInputs:   make(map[string]string),
 	}
 }
 
@@ -62,6 +76,10 @@ func (m SelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.currentScreen {
 		case ScreenSelection:
 			return m.updateSelection(msg)
+		case ScreenExchangeSelection:
+			return m.updateExchangeSelection(msg)
+		case ScreenCredentials:
+			return m.updateCredentials(msg)
 		case ScreenConfirmation:
 			return m.updateConfirmation(msg)
 		case ScreenSuccess:
@@ -100,18 +118,171 @@ func (m SelectionModel) updateSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter", " ":
 		// Select the current strategy
 		m.selected = &m.strategies[m.cursor]
-		m.currentScreen = ScreenConfirmation
-		m.confirmInput = ""
+
+		// If only one exchange, auto-select it and move to credentials
+		if len(m.selected.Config.Exchanges) == 1 {
+			m.selectedExchange = &m.selected.Config.Exchanges[0]
+			m.setupCredentialFields()
+			m.currentScreen = ScreenCredentials
+		} else {
+			// Multiple exchanges, let user choose
+			m.currentScreen = ScreenExchangeSelection
+			m.exchangeCursor = 0
+		}
 	}
 
 	return m, nil
 }
 
-func (m SelectionModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m SelectionModel) updateExchangeSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.currentScreen = ScreenSelection
 		m.selected = nil
+
+	case "ctrl+c":
+		return m, tea.Quit
+
+	case "up", "k":
+		if m.exchangeCursor > 0 {
+			m.exchangeCursor--
+		}
+
+	case "down", "j":
+		if m.selected != nil && m.exchangeCursor < len(m.selected.Config.Exchanges)-1 {
+			m.exchangeCursor++
+		}
+
+	case "enter", " ":
+		// Select the current exchange
+		if m.selected != nil && m.exchangeCursor < len(m.selected.Config.Exchanges) {
+			m.selectedExchange = &m.selected.Config.Exchanges[m.exchangeCursor]
+			m.setupCredentialFields()
+			m.currentScreen = ScreenCredentials
+		}
+	}
+
+	return m, nil
+}
+
+func (m SelectionModel) updateCredentials(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		// Go back to exchange selection or strategy selection
+		if len(m.selected.Config.Exchanges) > 1 {
+			m.currentScreen = ScreenExchangeSelection
+		} else {
+			m.currentScreen = ScreenSelection
+		}
+		m.selectedExchange = nil
+		m.fieldInputs = make(map[string]string)
+
+	case "ctrl+c":
+		return m, tea.Quit
+
+	case "tab", "down":
+		// Move to next field
+		if m.currentField < len(m.credentialFields)-1 {
+			m.currentField++
+		}
+
+	case "shift+tab", "up":
+		// Move to previous field
+		if m.currentField > 0 {
+			m.currentField--
+		}
+
+	case "backspace":
+		// Delete character from current field
+		currentFieldName := m.credentialFields[m.currentField]
+		if len(m.fieldInputs[currentFieldName]) > 0 {
+			m.fieldInputs[currentFieldName] = m.fieldInputs[currentFieldName][:len(m.fieldInputs[currentFieldName])-1]
+		}
+
+	case "enter":
+		// Move to next field, or if on last field, proceed to confirmation
+		if m.currentField < len(m.credentialFields)-1 {
+			m.currentField++
+		} else {
+			// Save credentials to the exchange config
+			for field, value := range m.fieldInputs {
+				if m.selectedExchange != nil && m.selectedExchange.Credentials != nil {
+					m.selectedExchange.Credentials[field] = value
+				}
+			}
+			m.currentScreen = ScreenConfirmation
+			m.confirmInput = ""
+		}
+
+	default:
+		// Add typed character to current field input
+		currentFieldName := m.credentialFields[m.currentField]
+		m.fieldInputs[currentFieldName] += msg.String()
+	}
+
+	return m, nil
+}
+
+// setupCredentialFields determines what credential fields are needed based on the selected exchange
+func (m *SelectionModel) setupCredentialFields() {
+	if m.selectedExchange == nil {
+		return
+	}
+
+	m.currentField = 0
+	m.fieldInputs = make(map[string]string)
+
+	// Determine required fields based on exchange
+	switch m.selectedExchange.Name {
+	case "paradex":
+		m.credentialFields = []string{
+			"account_address",
+			"eth_private_key",
+			"l2_private_key",
+		}
+		// Pre-fill with existing values if any
+		if m.selectedExchange.Credentials != nil {
+			for _, field := range m.credentialFields {
+				if val, ok := m.selectedExchange.Credentials[field]; ok {
+					m.fieldInputs[field] = val
+				} else {
+					m.fieldInputs[field] = ""
+				}
+			}
+		}
+
+	case "bybit", "binance", "kraken":
+		m.credentialFields = []string{
+			"api_key",
+			"api_secret",
+		}
+		// Pre-fill with existing values if any
+		if m.selectedExchange.Credentials != nil {
+			for _, field := range m.credentialFields {
+				if val, ok := m.selectedExchange.Credentials[field]; ok {
+					m.fieldInputs[field] = val
+				} else {
+					m.fieldInputs[field] = ""
+				}
+			}
+		}
+
+	default:
+		// Generic API key/secret for unknown exchanges
+		m.credentialFields = []string{
+			"api_key",
+			"api_secret",
+		}
+		m.fieldInputs["api_key"] = ""
+		m.fieldInputs["api_secret"] = ""
+	}
+}
+
+func (m SelectionModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		// Go back to credentials screen
+		m.currentScreen = ScreenCredentials
 		m.confirmInput = ""
 
 	case "ctrl+c":
@@ -141,6 +312,10 @@ func (m SelectionModel) View() string {
 	switch m.currentScreen {
 	case ScreenSelection:
 		return m.renderSelection()
+	case ScreenExchangeSelection:
+		return m.renderExchangeSelection()
+	case ScreenCredentials:
+		return m.renderCredentials()
 	case ScreenConfirmation:
 		return m.renderConfirmation()
 	case ScreenSuccess:
@@ -244,6 +419,127 @@ func (m SelectionModel) renderSelection() string {
 	return b.String()
 }
 
+func (m SelectionModel) renderExchangeSelection() string {
+	if m.selected == nil {
+		return "No strategy selected"
+	}
+
+	var b strings.Builder
+
+	// Title
+	title := TitleStyle.Render("SELECT EXCHANGE")
+	subtitle := SubtitleStyle.Render(fmt.Sprintf("Choose exchange for %s strategy", m.selected.Name))
+
+	b.WriteString("\n")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, title))
+	b.WriteString("\n")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, subtitle))
+	b.WriteString("\n\n")
+
+	// Exchange list
+	for i, exConfig := range m.selected.Config.Exchanges {
+		if !exConfig.Enabled {
+			continue
+		}
+
+		cursor := "  "
+		if m.exchangeCursor == i {
+			cursor = "▶ "
+		}
+
+		// Build exchange item
+		name := exConfig.Name
+		if m.exchangeCursor == i {
+			name = StrategyNameSelectedStyle.Render(name)
+		} else {
+			name = StrategyNameStyle.Render(name)
+		}
+
+		assetInfo := StrategyMetaStyle.Render(fmt.Sprintf("Assets: %s", strings.Join(exConfig.Assets, ", ")))
+
+		networkInfo := ""
+		if exConfig.Network != "" {
+			networkInfo = StrategyMetaStyle.Render(fmt.Sprintf("Network: %s", exConfig.Network))
+		}
+
+		itemContent := fmt.Sprintf("%s\n%s", name, assetInfo)
+		if networkInfo != "" {
+			itemContent += "\n" + networkInfo
+		}
+
+		var item string
+		if m.exchangeCursor == i {
+			item = StrategyItemSelectedStyle.Render(cursor + itemContent)
+		} else {
+			item = StrategyItemStyle.Render(cursor + itemContent)
+		}
+
+		b.WriteString(lipgloss.Place(m.width, lipgloss.Height(item), lipgloss.Center, lipgloss.Top, item))
+		b.WriteString("\n")
+	}
+
+	// Help text
+	help := HelpStyle.Render("↑↓/jk Navigate  ↵ Select  esc Back  ctrl+c Quit")
+	b.WriteString("\n")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
+
+	return b.String()
+}
+
+func (m SelectionModel) renderCredentials() string {
+	if m.selected == nil || m.selectedExchange == nil {
+		return "No exchange selected"
+	}
+
+	var b strings.Builder
+
+	// Title
+	title := TitleStyle.Render(fmt.Sprintf("🔐 %s CREDENTIALS", strings.ToUpper(m.selectedExchange.Name)))
+	subtitle := SubtitleStyle.Render("Enter your API credentials")
+
+	b.WriteString("\n\n")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, title))
+	b.WriteString("\n")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, subtitle))
+	b.WriteString("\n\n")
+
+	// Render each credential field
+	for i, field := range m.credentialFields {
+		// Format field name for display
+		displayName := strings.ReplaceAll(field, "_", " ")
+		displayName = strings.Title(displayName)
+
+		label := ConfirmFieldStyle.Render(displayName + ":")
+
+		// Get current input value
+		inputValue := m.fieldInputs[field]
+
+		// Mask sensitive fields
+		if strings.Contains(field, "key") || strings.Contains(field, "secret") {
+			if len(inputValue) > 0 {
+				inputValue = strings.Repeat("*", len(inputValue))
+			}
+		}
+
+		// Highlight current field
+		if i == m.currentField {
+			inputValue = ConfirmValueStyle.Render(inputValue + "█") // Cursor
+		} else {
+			inputValue = StrategyMetaStyle.Render(inputValue)
+		}
+
+		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, label+" "+inputValue))
+		b.WriteString("\n")
+	}
+
+	// Help text
+	b.WriteString("\n")
+	help := HelpStyle.Render("↑↓/tab Navigate  ↵ Next/Continue  esc Back  ctrl+c Quit")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
+
+	return b.String()
+}
+
 func (m SelectionModel) renderConfirmation() string {
 	if m.selected == nil {
 		return "No strategy selected"
@@ -266,18 +562,24 @@ func (m SelectionModel) renderConfirmation() string {
 		ConfirmValueStyle.Render(m.selected.Name),
 	))
 
-	// Exchanges
-	for _, ex := range m.selected.Exchanges {
-		if ex.Enabled {
+	// Selected exchange and assets
+	if m.selectedExchange != nil {
+		details = append(details, fmt.Sprintf("%s  %s",
+			ConfirmFieldStyle.Render("Exchange:"),
+			ConfirmValueStyle.Render(m.selectedExchange.Name),
+		))
+
+		if m.selectedExchange.Network != "" {
 			details = append(details, fmt.Sprintf("%s  %s",
-				ConfirmFieldStyle.Render("Exchange:"),
-				ConfirmValueStyle.Render(ex.Name),
-			))
-			details = append(details, fmt.Sprintf("%s  %s",
-				ConfirmFieldStyle.Render("Assets:"),
-				ConfirmValueStyle.Render(strings.Join(ex.Assets, ", ")),
+				ConfirmFieldStyle.Render("Network:"),
+				ConfirmValueStyle.Render(m.selectedExchange.Network),
 			))
 		}
+
+		details = append(details, fmt.Sprintf("%s  %s",
+			ConfirmFieldStyle.Render("Assets:"),
+			ConfirmValueStyle.Render(strings.Join(m.selectedExchange.Assets, ", ")),
+		))
 	}
 
 	// Mode
@@ -341,39 +643,67 @@ func (m SelectionModel) renderSuccess() string {
 	b.WriteString(fmt.Sprintf("%s  %s", successIcon, title))
 	b.WriteString("\n\n")
 
-	// What would happen next
+	// Build the actual command that will be executed
 	nextSteps := []string{
 		"",
-		"Command that would be executed:",
+		"Command to be executed:",
 		"",
 	}
 
-	// Add exchange info if available
-	if len(m.selected.Exchanges) > 0 {
-		nextSteps = append(nextSteps,
-			SubtitleStyle.Render(fmt.Sprintf("  live-trading --exchange %s \\", m.selected.Exchanges[0].Name)),
-			SubtitleStyle.Render(fmt.Sprintf("               --strategy %s/strategy.so \\", m.selected.Path)),
-			SubtitleStyle.Render(fmt.Sprintf("               --config %s/live.yml \\", m.selected.Path)),
-			SubtitleStyle.Render(fmt.Sprintf("               --mode %s", m.selected.Config.Execution.Mode)),
-		)
-	} else {
-		nextSteps = append(nextSteps,
-			SubtitleStyle.Render(fmt.Sprintf("  live-trading --strategy %s/strategy.so \\", m.selected.Path)),
-			SubtitleStyle.Render(fmt.Sprintf("               --config %s/live.yml \\", m.selected.Path)),
-			SubtitleStyle.Render(fmt.Sprintf("               --mode %s", m.selected.Config.Execution.Mode)),
-		)
+	if m.selectedExchange != nil {
+		// Get the .so file path
+		strategyName := filepath.Base(m.selected.Path)
+		soPath := filepath.Join(m.selected.Path, strategyName+".so")
+
+		// Build command based on exchange type
+		if m.selectedExchange.Name == "paradex" {
+			nextSteps = append(nextSteps,
+				SubtitleStyle.Render("  kronos-live run \\"),
+				SubtitleStyle.Render(fmt.Sprintf("    --exchange %s \\", m.selectedExchange.Name)),
+				SubtitleStyle.Render(fmt.Sprintf("    --strategy %s \\", soPath)),
+			)
+
+			// Add Paradex-specific flags
+			if accountAddr, ok := m.selectedExchange.Credentials["account_address"]; ok && accountAddr != "" {
+				nextSteps = append(nextSteps, SubtitleStyle.Render(fmt.Sprintf("    --paradex-account-address %s \\", accountAddr)))
+			}
+			if ethKey, ok := m.selectedExchange.Credentials["eth_private_key"]; ok && ethKey != "" {
+				masked := ethKey
+				if len(masked) > 10 {
+					masked = masked[:6] + "..." + masked[len(masked)-4:]
+				}
+				nextSteps = append(nextSteps, SubtitleStyle.Render(fmt.Sprintf("    --paradex-eth-private-key %s \\", masked)))
+			}
+			if l2Key, ok := m.selectedExchange.Credentials["l2_private_key"]; ok && l2Key != "" {
+				masked := l2Key
+				if len(masked) > 10 {
+					masked = masked[:6] + "..." + masked[len(masked)-4:]
+				}
+				nextSteps = append(nextSteps, SubtitleStyle.Render(fmt.Sprintf("    --paradex-l2-private-key %s \\", masked)))
+			}
+			if m.selectedExchange.Network != "" {
+				nextSteps = append(nextSteps, SubtitleStyle.Render(fmt.Sprintf("    --paradex-network %s", m.selectedExchange.Network)))
+			}
+		} else {
+			// Generic exchange command
+			nextSteps = append(nextSteps,
+				SubtitleStyle.Render("  kronos-live run \\"),
+				SubtitleStyle.Render(fmt.Sprintf("    --exchange %s \\", m.selectedExchange.Name)),
+				SubtitleStyle.Render(fmt.Sprintf("    --strategy %s", soPath)),
+			)
+		}
 	}
 
 	nextSteps = append(nextSteps,
 		"",
 		"",
-		StrategyMetaStyle.Render("(This is a demo - no actual deployment yet)"),
+		StrategyMetaStyle.Render("Press Enter to start live trading, or Q to quit"),
 		"",
 	)
 
 	b.WriteString(strings.Join(nextSteps, "\n"))
 
-	help := HelpStyle.Render("↵ Continue  q Quit")
+	help := HelpStyle.Render("↵ Start Live Trading  q Quit")
 	b.WriteString("\n")
 	b.WriteString(help)
 
@@ -383,8 +713,12 @@ func (m SelectionModel) renderSuccess() string {
 
 // RunSelectionTUI runs the strategy selection TUI
 func RunSelectionTUI() error {
-	// Get mock strategies for demo
-	strategies := GetMockStrategies()
+	// Try to discover strategies from ./strategies directory
+	strategies, err := DiscoverStrategies()
+	if err != nil {
+		// Fall back to mock strategies if discovery fails
+		strategies = GetMockStrategies()
+	}
 
 	// Create model
 	m := NewSelectionModel(strategies)
@@ -401,6 +735,20 @@ func RunSelectionTUI() error {
 	if model, ok := finalModel.(SelectionModel); ok {
 		if model.err != nil {
 			return model.err
+		}
+
+		// Save credentials back to YAML if a strategy was successfully configured
+		if model.selected != nil && model.selectedExchange != nil && model.currentScreen == ScreenSuccess {
+			configPath := filepath.Join(model.selected.Path, "live.yml")
+			if err := SaveStrategyConfig(configPath, model.selected.Config); err != nil {
+				return fmt.Errorf("failed to save credentials: %w", err)
+			}
+
+			// Execute live trading
+			fmt.Println("\n🚀 Starting live trading...\n")
+			if err := ExecuteLiveTrading(model.selected, model.selectedExchange); err != nil {
+				return fmt.Errorf("failed to execute live trading: %w", err)
+			}
 		}
 	}
 
