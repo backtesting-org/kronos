@@ -16,11 +16,6 @@ func (s *LiveService) RunSelectionTUI() error {
 }
 
 func (s *LiveService) GetStrategies() ([]live.Strategy, error) {
-	// Try to discover strategies from ./strategies directory
-	strategies, err := live.DiscoverStrategies()
-	if err != nil {
-		// Fall back to mock strategies if discovery fails
-		return live.GetMockStrategies(), nil
-	}
-	return strategies, nil
+	// Discover strategies from ./strategies directory
+	return live.DiscoverStrategies()
 }

@@ -748,15 +748,14 @@ func RunSelectionTUI() error {
 	// Try to discover strategies from ./strategies directory
 	strategies, err := DiscoverStrategies()
 	if err != nil {
-		// Fall back to mock strategies if discovery fails
-		strategies = GetMockStrategies()
+		return fmt.Errorf("no strategies found: %w\n\nPlease create a strategy in ./strategies/ with a config.yml file", err)
 	}
 
 	// Load global exchanges config
 	exchangesConfigPath := "./exchanges.yml"
 	globalExchanges, err := LoadGlobalExchangesConfig(exchangesConfigPath)
 	if err != nil {
-		return fmt.Errorf("failed to load global exchanges config: %w", err)
+		return fmt.Errorf("failed to load global exchanges config: %w\n\nPlease create exchanges.yml at the project root", err)
 	}
 
 	// Create model
@@ -783,7 +782,7 @@ func RunSelectionTUI() error {
 			}
 
 			// Execute live trading
-			fmt.Println("\n🚀 Starting live trading...\n")
+			fmt.Println("\n🚀 Starting live trading...")
 			if err := ExecuteLiveTrading(model.selected, model.selectedExchange); err != nil {
 				return fmt.Errorf("failed to execute live trading: %w", err)
 			}
