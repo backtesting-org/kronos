@@ -110,25 +110,35 @@ func (s *Scaffolder) generateConfigFiles(name, strategyExample string) error {
 	// Note: config.yml comes from the SDK example and contains only metadata
 	// We do NOT generate it here - it's downloaded with the strategy
 
-	// Generate exchanges.yml
-	exchangesYAML := `exchanges:
+	// Generate exchanges.yml with assets configuration
+	exchangesYAML := `# Global Exchange Configuration
+# Configure which exchanges and assets to trade
+
+exchanges:
   - name: binance
     enabled: true
     credentials:
       api_key: ""
       api_secret: ""
+    assets:
+      - BTC/USDT
+      - ETH/USDT
 
   - name: bybit
     enabled: true
     credentials:
       api_key: ""
       api_secret: ""
+    assets:
+      - BTC/USDT
 
   - name: paradex
     enabled: false
     credentials:
       account_address: ""
       eth_private_key: ""
+    assets:
+      - BTC/USD
 `
 
 	exchangesPath := filepath.Join(name, "exchanges.yml")
