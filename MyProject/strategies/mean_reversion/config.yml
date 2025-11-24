@@ -1,0 +1,30 @@
+# Strategy Metadata (required for Kronos CLI discovery)
+name: mean_reversion
+display_name: "Mean Reversion Strategy"
+description: "Bollinger Bands mean reversion with RSI confirmation"
+type: mean_reversion
+icon: "📈"
+
+# Strategy Parameters
+# (Assets and exchanges configured in global exchanges.yml)
+
+indicators:
+  bollinger_bands:
+    period: 20
+    std_dev: 2.0
+  rsi:
+    period: 14
+    oversold: 35
+    overbought: 65
+
+parameters:
+  position_size: 0.1  # Quantity per trade
+
+risk:
+  max_position_size: 1000
+  stop_loss_percent: 2.0
+  take_profit_percent: 5.0
+
+execution:
+  order_type: limit
+  slippage_tolerance: 0.1

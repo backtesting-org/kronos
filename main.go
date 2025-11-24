@@ -27,7 +27,7 @@ func main() {
 	app.Run()
 }
 
-func runCLI(lc fx.Lifecycle, commands *cmd.Commands) {
+func runCLI(lc fx.Lifecycle, shutdowner fx.Shutdowner, commands *cmd.Commands) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			// Run the CLI in a goroutine so fx can manage lifecycle
@@ -35,6 +35,8 @@ func runCLI(lc fx.Lifecycle, commands *cmd.Commands) {
 				if err := commands.Root.Execute(); err != nil {
 					log.Fatal(err)
 				}
+				// Shut down fx app after CLI command completes
+				shutdowner.Shutdown()
 			}()
 			return nil
 		},

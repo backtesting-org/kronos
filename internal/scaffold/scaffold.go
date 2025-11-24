@@ -50,7 +50,7 @@ func (s *Scaffolder) CreateProjectWithStrategy(name, strategyExample string) err
 		return err
 	}
 
-	s.printSuccess(name)
+	s.printSuccess(name, strategyExample)
 	return nil
 }
 
@@ -71,21 +71,33 @@ func (s *Scaffolder) generateFiles(name, strategyExample string, data ProjectDat
 		return fmt.Errorf("failed to checkout %s: %w", strategyExample, err)
 	}
 
-	// Move everything from examples/{strategy} to root
-	strategyDir := filepath.Join(name, "examples", strategyExample)
-	files, err := os.ReadDir(strategyDir)
+	// Create strategies directory in project root
+	strategiesDir := filepath.Join(name, "strategies")
+	if err := os.MkdirAll(strategiesDir, 0755); err != nil {
+		return fmt.Errorf("failed to create strategies directory: %w", err)
+	}
+
+	// Create strategy subdirectory (strategies/{strategy_name}/)
+	strategyDestDir := filepath.Join(strategiesDir, strategyExample)
+	if err := os.MkdirAll(strategyDestDir, 0755); err != nil {
+		return fmt.Errorf("failed to create strategy subdirectory: %w", err)
+	}
+
+	// Move everything from examples/{strategy} to strategies/{strategy_name}/
+	strategySourceDir := filepath.Join(name, "examples", strategyExample)
+	files, err := os.ReadDir(strategySourceDir)
 	if err != nil {
 		return fmt.Errorf("failed to read %s directory: %w", strategyExample, err)
 	}
 
 	for _, file := range files {
-		srcPath := filepath.Join(strategyDir, file.Name())
-		dstPath := filepath.Join(name, file.Name())
+		srcPath := filepath.Join(strategySourceDir, file.Name())
+		dstPath := filepath.Join(strategyDestDir, file.Name())
 
 		if err := os.Rename(srcPath, dstPath); err != nil {
 			return fmt.Errorf("failed to move %s: %w", file.Name(), err)
 		}
-		fmt.Printf("  📝 %s\n", file.Name())
+		fmt.Printf("  📝 strategies/%s/%s\n", strategyExample, file.Name())
 	}
 
 	// Remove examples directory
@@ -98,10 +110,60 @@ func (s *Scaffolder) generateFiles(name, strategyExample string, data ProjectDat
 		return fmt.Errorf("failed to remove .git directory: %w", err)
 	}
 
+	// Generate root-level files (go.mod, README.md)
+	if err := s.generateRootFiles(name, strategyExample, data); err != nil {
+		return fmt.Errorf("failed to generate root files: %w", err)
+	}
+
 	// Generate configuration files
 	if err := s.generateConfigFiles(name, strategyExample); err != nil {
 		return fmt.Errorf("failed to generate config files: %w", err)
 	}
+
+	return nil
+}
+
+func (s *Scaffolder) generateRootFiles(name, strategyExample string, data ProjectData) error {
+	// Generate go.mod
+	goModContent := fmt.Sprintf(`module %s
+
+go 1.23
+
+require github.com/backtesting-org/kronos-sdk v0.0.0
+`, data.ModulePath)
+
+	goModPath := filepath.Join(name, "go.mod")
+	if err := os.WriteFile(goModPath, []byte(goModContent), 0644); err != nil {
+		return fmt.Errorf("failed to write go.mod: %w", err)
+	}
+	fmt.Printf("  📝 go.mod\n")
+
+	// Generate README.md
+	readmeContent := fmt.Sprintf(`# %s
+
+A Kronos trading strategy project using the %s strategy.
+
+## Setup
+
+1. Configure your exchange credentials in `+"`exchanges.yml`"+`
+2. Install dependencies: `+"`go mod tidy`"+`
+3. Run the strategy: `+"`go run strategies/%s/strategy.go`"+`
+
+## Configuration
+
+- `+"`exchanges.yml`"+` - Global exchange and asset configuration
+- `+"`strategies/%s/config.yml`"+` - Strategy-specific parameters
+
+## Documentation
+
+For more information, visit: https://github.com/backtesting-org/kronos-sdk
+`, name, strategyExample, strategyExample, strategyExample)
+
+	readmePath := filepath.Join(name, "README.md")
+	if err := os.WriteFile(readmePath, []byte(readmeContent), 0644); err != nil {
+		return fmt.Errorf("failed to write README.md: %w", err)
+	}
+	fmt.Printf("  📝 README.md\n")
 
 	return nil
 }
@@ -175,15 +237,16 @@ bin/
 	return nil
 }
 
-func (s *Scaffolder) printSuccess(name string) {
+func (s *Scaffolder) printSuccess(name, strategyExample string) {
 	blue := color.New(color.FgBlue)
 
-	fmt.Printf("\n✅ Project created!\n\n")
+	fmt.Printf("\n✅ Project created successfully!\n\n")
 	fmt.Printf("Next steps:\n")
 	fmt.Printf("  %s\n", blue.Sprint("cd "+name))
 	fmt.Printf("  %s\n", blue.Sprint("go mod tidy"))
-	fmt.Printf("  %s\n", blue.Sprint("go run strategy.go"))
+	fmt.Printf("  %s\n", blue.Sprint(fmt.Sprintf("go run strategies/%s/strategy.go", strategyExample)))
 	fmt.Printf("\n")
 	fmt.Printf("📝 Important:\n")
-	fmt.Printf("  • exchanges.yml - Add your API credentials\n")
+	fmt.Printf("  • Edit exchanges.yml to add your API credentials\n")
+	fmt.Printf("  • Configure strategy parameters in strategies/%s/config.yml\n", strategyExample)
 }

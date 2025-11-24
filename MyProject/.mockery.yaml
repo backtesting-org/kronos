@@ -1,0 +1,10 @@
+with-expecter: true
+dir: "mocks/{{.PackagePath}}"
+filename: "{{.InterfaceName}}.go"
+mockname: "{{.InterfaceName}}"
+outpkg: "{{.PackageName}}"
+packages:
+  github.com/backtesting-org/kronos-sdk/pkg/types:
+    config:
+      recursive: true
+      all: true
