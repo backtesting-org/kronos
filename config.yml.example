@@ -1,0 +1,41 @@
+# Strategy Configuration Template
+# Place this file as config.yml in your strategy directory (e.g., strategies/momentum/config.yml)
+# This file contains strategy-specific settings
+
+# Strategy metadata
+name: my-strategy
+description: My trading strategy description
+status: ready  # ready, running, stopped, error
+
+# Exchanges to use (references exchanges defined in global exchanges.yml)
+exchanges:
+  - paradex
+  - bybit
+
+# Assets per exchange
+# Each exchange can have different assets
+assets:
+  paradex:
+    - BTC-USD-PERP
+    - ETH-USD-PERP
+  bybit:
+    - BTCUSDT
+    - ETHUSDT
+
+# Strategy-specific parameters
+# These are passed to your strategy plugin
+parameters:
+  lookback_period: 20
+  entry_threshold: 0.02
+  exit_threshold: 0.01
+  order_size: 1.0
+
+# Risk management settings (strategy-specific)
+risk:
+  max_position_size: 10000.0   # Maximum position size in USD
+  max_daily_loss: 1000.0        # Maximum daily loss in USD
+
+# Execution settings
+execution:
+  dry_run: true   # Set to false for live trading
+  mode: live      # live or backtest

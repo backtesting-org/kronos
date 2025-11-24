@@ -33,6 +33,7 @@ type SelectionModel struct {
 	scrollOffset       int
 	selected           *Strategy
 	selectedExchange   *ExchangeConfig
+	globalExchanges    *GlobalExchangesConfig  // Global exchanges config
 	currentScreen      Screen
 	confirmInput       string
 	width              int
@@ -50,14 +51,15 @@ type SelectionModel struct {
 }
 
 // NewSelectionModel creates a new strategy selection model
-func NewSelectionModel(strategies []Strategy) SelectionModel {
+func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesConfig) SelectionModel {
 	return SelectionModel{
-		strategies:    strategies,
-		cursor:        0,
-		currentScreen: ScreenSelection,
-		width:         80,
-		height:        24,
-		fieldInputs:   make(map[string]string),
+		strategies:      strategies,
+		globalExchanges: globalExchanges,
+		cursor:          0,
+		currentScreen:   ScreenSelection,
+		width:           80,
+		height:          24,
+		fieldInputs:     make(map[string]string),
 	}
 }
 
@@ -119,15 +121,21 @@ func (m SelectionModel) updateSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Select the current strategy
 		m.selected = &m.strategies[m.cursor]
 
-		// If only one exchange, auto-select it and move to credentials
-		if len(m.selected.Config.Exchanges) == 1 {
-			m.selectedExchange = &m.selected.Config.Exchanges[0]
+		// Get available exchanges for this strategy from global config
+		availableExchanges := m.getAvailableExchangesForStrategy()
+
+		if len(availableExchanges) == 1 {
+			// Only one exchange, auto-select it and move to credentials
+			m.selectedExchange = availableExchanges[0]
 			m.setupCredentialFields()
 			m.currentScreen = ScreenCredentials
-		} else {
+		} else if len(availableExchanges) > 1 {
 			// Multiple exchanges, let user choose
 			m.currentScreen = ScreenExchangeSelection
 			m.exchangeCursor = 0
+		} else {
+			// No exchanges configured
+			m.err = fmt.Errorf("no exchanges configured for this strategy")
 		}
 	}
 
@@ -135,6 +143,8 @@ func (m SelectionModel) updateSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m SelectionModel) updateExchangeSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	availableExchanges := m.getAvailableExchangesForStrategy()
+
 	switch msg.String() {
 	case "esc":
 		m.currentScreen = ScreenSelection
@@ -149,14 +159,14 @@ func (m SelectionModel) updateExchangeSelection(msg tea.KeyMsg) (tea.Model, tea.
 		}
 
 	case "down", "j":
-		if m.selected != nil && m.exchangeCursor < len(m.selected.Config.Exchanges)-1 {
+		if m.exchangeCursor < len(availableExchanges)-1 {
 			m.exchangeCursor++
 		}
 
 	case "enter", " ":
 		// Select the current exchange
-		if m.selected != nil && m.exchangeCursor < len(m.selected.Config.Exchanges) {
-			m.selectedExchange = &m.selected.Config.Exchanges[m.exchangeCursor]
+		if m.exchangeCursor < len(availableExchanges) {
+			m.selectedExchange = availableExchanges[m.exchangeCursor]
 			m.setupCredentialFields()
 			m.currentScreen = ScreenCredentials
 		}
@@ -221,6 +231,26 @@ func (m SelectionModel) updateCredentials(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// getAvailableExchangesForStrategy returns the list of exchange configs available for the selected strategy
+func (m *SelectionModel) getAvailableExchangesForStrategy() []*ExchangeConfig {
+	if m.selected == nil || m.globalExchanges == nil {
+		return []*ExchangeConfig{}
+	}
+
+	var available []*ExchangeConfig
+	for _, exchangeName := range m.selected.Config.Exchanges {
+		// Find this exchange in global config
+		for i := range m.globalExchanges.Exchanges {
+			if m.globalExchanges.Exchanges[i].Name == exchangeName && m.globalExchanges.Exchanges[i].Enabled {
+				available = append(available, &m.globalExchanges.Exchanges[i])
+				break
+			}
+		}
+	}
+
+	return available
 }
 
 // setupCredentialFields determines what credential fields are needed based on the selected exchange
@@ -424,6 +454,8 @@ func (m SelectionModel) renderExchangeSelection() string {
 		return "No strategy selected"
 	}
 
+	availableExchanges := m.getAvailableExchangesForStrategy()
+
 	var b strings.Builder
 
 	// Title
@@ -437,11 +469,7 @@ func (m SelectionModel) renderExchangeSelection() string {
 	b.WriteString("\n\n")
 
 	// Exchange list
-	for i, exConfig := range m.selected.Config.Exchanges {
-		if !exConfig.Enabled {
-			continue
-		}
-
+	for i, exConfig := range availableExchanges {
 		cursor := "  "
 		if m.exchangeCursor == i {
 			cursor = "▶ "
@@ -455,7 +483,9 @@ func (m SelectionModel) renderExchangeSelection() string {
 			name = StrategyNameStyle.Render(name)
 		}
 
-		assetInfo := StrategyMetaStyle.Render(fmt.Sprintf("Assets: %s", strings.Join(exConfig.Assets, ", ")))
+		// Get assets for this exchange from strategy config
+		assets := m.selected.Config.Assets[exConfig.Name]
+		assetInfo := StrategyMetaStyle.Render(fmt.Sprintf("Assets: %s", strings.Join(assets, ", ")))
 
 		networkInfo := ""
 		if exConfig.Network != "" {
@@ -576,9 +606,11 @@ func (m SelectionModel) renderConfirmation() string {
 			))
 		}
 
+		// Get assets from strategy config
+		assets := m.selected.Config.Assets[m.selectedExchange.Name]
 		details = append(details, fmt.Sprintf("%s  %s",
 			ConfirmFieldStyle.Render("Assets:"),
-			ConfirmValueStyle.Render(strings.Join(m.selectedExchange.Assets, ", ")),
+			ConfirmValueStyle.Render(strings.Join(assets, ", ")),
 		))
 	}
 
@@ -720,8 +752,15 @@ func RunSelectionTUI() error {
 		strategies = GetMockStrategies()
 	}
 
+	// Load global exchanges config
+	exchangesConfigPath := "./exchanges.yml"
+	globalExchanges, err := LoadGlobalExchangesConfig(exchangesConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to load global exchanges config: %w", err)
+	}
+
 	// Create model
-	m := NewSelectionModel(strategies)
+	m := NewSelectionModel(strategies, globalExchanges)
 
 	// Run the program
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -737,10 +776,9 @@ func RunSelectionTUI() error {
 			return model.err
 		}
 
-		// Save credentials back to YAML if a strategy was successfully configured
+		// Save credentials back to global exchanges.yml if a strategy was successfully configured
 		if model.selected != nil && model.selectedExchange != nil && model.currentScreen == ScreenSuccess {
-			configPath := filepath.Join(model.selected.Path, "live.yml")
-			if err := SaveStrategyConfig(configPath, model.selected.Config); err != nil {
+			if err := SaveGlobalExchangesConfig(exchangesConfigPath, model.globalExchanges); err != nil {
 				return fmt.Errorf("failed to save credentials: %w", err)
 			}
 

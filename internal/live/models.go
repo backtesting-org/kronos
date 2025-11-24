@@ -36,14 +36,21 @@ type Exchange struct {
 	Assets  []string
 }
 
-// StrategyConfig represents the parsed live.yml config
+// StrategyConfig represents the parsed config.yml for a strategy
 type StrategyConfig struct {
 	Name        string                  `yaml:"name"`
 	Description string                  `yaml:"description"`
 	Status      string                  `yaml:"status"`
-	Exchanges   []ExchangeConfig        `yaml:"exchanges"`
+	Exchanges   []string                `yaml:"exchanges"`        // Exchange names (references exchanges.yml)
+	Assets      map[string][]string     `yaml:"assets"`           // Assets per exchange
+	Parameters  map[string]interface{}  `yaml:"parameters"`       // Strategy-specific parameters
 	Risk        RiskConfig              `yaml:"risk"`
 	Execution   ExecutionConfig         `yaml:"execution"`
+}
+
+// GlobalExchangesConfig represents the exchanges.yml file at project root
+type GlobalExchangesConfig struct {
+	Exchanges []ExchangeConfig `yaml:"exchanges"`
 }
 
 // ParadexCredentials represents Paradex-specific credentials
@@ -77,10 +84,23 @@ type ExecutionConfig struct {
 // DiscoverStrategies scans the ./strategies directory for available strategies
 func DiscoverStrategies() ([]Strategy, error) {
 	strategiesDir := "./strategies"
+	exchangesConfigPath := "./exchanges.yml"
 
 	// Check if strategies directory exists
 	if _, err := os.Stat(strategiesDir); os.IsNotExist(err) {
 		return nil, fmt.Errorf("strategies directory not found: %s", strategiesDir)
+	}
+
+	// Load global exchanges config
+	globalExchanges, err := LoadGlobalExchangesConfig(exchangesConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load global exchanges config: %w", err)
+	}
+
+	// Create a map of exchange configs by name for quick lookup
+	exchangeMap := make(map[string]*ExchangeConfig)
+	for i := range globalExchanges.Exchanges {
+		exchangeMap[globalExchanges.Exchanges[i].Name] = &globalExchanges.Exchanges[i]
 	}
 
 	// Read all subdirectories in strategies/
@@ -97,11 +117,11 @@ func DiscoverStrategies() ([]Strategy, error) {
 		}
 
 		strategyPath := filepath.Join(strategiesDir, entry.Name())
-		configPath := filepath.Join(strategyPath, "live.yml")
+		configPath := filepath.Join(strategyPath, "config.yml")
 
-		// Check if live.yml exists
+		// Check if config.yml exists
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			// Skip directories without live.yml
+			// Skip directories without config.yml
 			continue
 		}
 
@@ -119,14 +139,20 @@ func DiscoverStrategies() ([]Strategy, error) {
 			config.Status = "error"
 		}
 
-		// Convert ExchangeConfig to Exchange
+		// Merge strategy config with global exchange configs
 		exchanges := make([]Exchange, 0, len(config.Exchanges))
-		for _, exConfig := range config.Exchanges {
-			if exConfig.Enabled {
+		for _, exchangeName := range config.Exchanges {
+			if globalEx, ok := exchangeMap[exchangeName]; ok && globalEx.Enabled {
+				// Get assets for this exchange from strategy config
+				assets := config.Assets[exchangeName]
+				if assets == nil {
+					assets = []string{}
+				}
+
 				exchanges = append(exchanges, Exchange{
-					Name:    exConfig.Name,
-					Enabled: exConfig.Enabled,
-					Assets:  exConfig.Assets,
+					Name:    globalEx.Name,
+					Enabled: globalEx.Enabled,
+					Assets:  assets,
 				})
 			}
 		}
@@ -145,7 +171,7 @@ func DiscoverStrategies() ([]Strategy, error) {
 	}
 
 	if len(strategies) == 0 {
-		return nil, fmt.Errorf("no strategies found in %s (make sure each strategy has a live.yml file)", strategiesDir)
+		return nil, fmt.Errorf("no strategies found in %s (make sure each strategy has a config.yml file)", strategiesDir)
 	}
 
 	return strategies, nil
@@ -168,21 +194,20 @@ func LoadStrategyConfig(path string) (*StrategyConfig, error) {
 		config.Status = "ready"
 	}
 
-	// Initialize credentials map for each exchange
-	for i := range config.Exchanges {
-		if config.Exchanges[i].Credentials == nil {
-			config.Exchanges[i].Credentials = make(map[string]string)
-		}
-		// Set default network for Paradex
-		if config.Exchanges[i].Name == "paradex" && config.Exchanges[i].Network == "" {
-			config.Exchanges[i].Network = "mainnet"
-		}
+	// Initialize assets map if nil
+	if config.Assets == nil {
+		config.Assets = make(map[string][]string)
+	}
+
+	// Initialize parameters map if nil
+	if config.Parameters == nil {
+		config.Parameters = make(map[string]interface{})
 	}
 
 	return &config, nil
 }
 
-// SaveStrategyConfig saves a strategy config to live.yml
+// SaveStrategyConfig saves a strategy config to config.yml
 func SaveStrategyConfig(path string, config *StrategyConfig) error {
 	data, err := yaml.Marshal(config)
 	if err != nil {
@@ -191,6 +216,46 @@ func SaveStrategyConfig(path string, config *StrategyConfig) error {
 
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
+// LoadGlobalExchangesConfig loads the global exchanges.yml from project root
+func LoadGlobalExchangesConfig(path string) (*GlobalExchangesConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Return empty config if file doesn't exist
+			return &GlobalExchangesConfig{Exchanges: []ExchangeConfig{}}, nil
+		}
+		return nil, fmt.Errorf("failed to read exchanges config: %w", err)
+	}
+
+	var config GlobalExchangesConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse exchanges config: %w", err)
+	}
+
+	// Initialize credentials maps
+	for i := range config.Exchanges {
+		if config.Exchanges[i].Credentials == nil {
+			config.Exchanges[i].Credentials = make(map[string]string)
+		}
+	}
+
+	return &config, nil
+}
+
+// SaveGlobalExchangesConfig saves the global exchanges config to exchanges.yml
+func SaveGlobalExchangesConfig(path string, config *GlobalExchangesConfig) error {
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal exchanges config: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write exchanges config: %w", err)
 	}
 
 	return nil
@@ -227,14 +292,14 @@ func GetMockStrategies() []Strategy {
 				Name:        "momentum",
 				Description: "Trend-following momentum strategy",
 				Status:      "ready",
-				Exchanges: []ExchangeConfig{
-					{
-						Name:        "paradex",
-						Enabled:     true,
-						Network:     "mainnet",
-						Assets:      []string{"BTC-USD-PERP", "ETH-USD-PERP"},
-						Credentials: make(map[string]string),
-					},
+				Exchanges:   []string{"paradex"},
+				Assets: map[string][]string{
+					"paradex": {"BTC-USD-PERP", "ETH-USD-PERP"},
+				},
+				Parameters: map[string]interface{}{
+					"lookback_period":  20,
+					"entry_threshold":  0.02,
+					"exit_threshold":   0.01,
 				},
 				Risk: RiskConfig{
 					MaxPositionSize: 10000,
@@ -259,19 +324,14 @@ func GetMockStrategies() []Strategy {
 				Name:        "arbitrage",
 				Description: "Cross-exchange arbitrage",
 				Status:      "ready",
-				Exchanges: []ExchangeConfig{
-					{
-						Name:        "binance",
-						Enabled:     true,
-						Assets:      []string{"BTCUSDT", "ETHUSDT"},
-						Credentials: make(map[string]string),
-					},
-					{
-						Name:        "kraken",
-						Enabled:     true,
-						Assets:      []string{"BTCUSD", "ETHUSD"},
-						Credentials: make(map[string]string),
-					},
+				Exchanges:   []string{"binance", "kraken"},
+				Assets: map[string][]string{
+					"binance": {"BTCUSDT", "ETHUSDT"},
+					"kraken":  {"BTCUSD", "ETHUSD"},
+				},
+				Parameters: map[string]interface{}{
+					"min_spread":   0.005,
+					"order_size":   1.0,
 				},
 				Risk: RiskConfig{
 					MaxPositionSize: 5000,
@@ -295,14 +355,14 @@ func GetMockStrategies() []Strategy {
 				Name:        "market_making",
 				Description: "Automated market making strategy",
 				Status:      "ready",
-				Exchanges: []ExchangeConfig{
-					{
-						Name:        "paradex",
-						Enabled:     true,
-						Network:     "mainnet",
-						Assets:      []string{"SOL-USD-PERP"},
-						Credentials: make(map[string]string),
-					},
+				Exchanges:   []string{"paradex"},
+				Assets: map[string][]string{
+					"paradex": {"SOL-USD-PERP"},
+				},
+				Parameters: map[string]interface{}{
+					"spread_bps":    10,
+					"order_levels":  5,
+					"order_size":    0.5,
 				},
 				Risk: RiskConfig{
 					MaxPositionSize: 20000,
