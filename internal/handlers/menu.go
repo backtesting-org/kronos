@@ -91,12 +91,30 @@ func (m mainMenuModel) View() string {
 }
 
 func (h *RootHandler) handleCreateProject(cmd *cobra.Command) error {
-	fmt.Print("\nEnter project name: ")
+	// Build a styled input prompt
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00D9FF"))
+
+	promptStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#D1D5DB"))
+
+	mutedStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6B7280")).
+		Italic(true)
+
+	fmt.Println()
+	fmt.Println(titleStyle.Render("🆕 CREATE NEW PROJECT"))
+	fmt.Println()
+	fmt.Print(promptStyle.Render("Project name: "))
+
 	var projectName string
 	fmt.Scanln(&projectName)
+
 	if projectName == "" {
-		fmt.Println("Project name required")
+		fmt.Println(mutedStyle.Render("✗ Project name required"))
 		return nil
 	}
+
 	return h.initHandler.Handle(cmd, []string{projectName})
 }
