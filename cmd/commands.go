@@ -1,0 +1,106 @@
+package cmd
+
+import (
+	"github.com/backtesting-org/kronos-cli/internal/handlers"
+	"github.com/spf13/cobra"
+)
+
+// Commands struct holds all command handlers
+type Commands struct {
+	Root     *cobra.Command
+	Init     *cobra.Command
+	Live     *cobra.Command
+	Backtest *cobra.Command
+	Analyze  *cobra.Command
+	Version  *cobra.Command
+}
+
+// NewCommands creates all cobra commands and wires them to handlers
+func NewCommands(
+	rootHandler *handlers.RootHandler,
+	initHandler *handlers.InitHandler,
+	liveHandler *handlers.LiveHandler,
+	backtestHandler *handlers.BacktestHandler,
+	analyzeHandler *handlers.AnalyzeHandler,
+) *Commands {
+	// Root command
+	rootCmd := &cobra.Command{
+		Use:   "kronos",
+		Short: "Kronos - Trading infrastructure platform",
+		Long: `Kronos CLI - Beautiful backtesting and live trading infrastructure
+
+Use Kronos to:
+  • Configure backtests via YAML
+  • Run backtests locally with deterministic simulation
+  • Deploy strategies live
+  • Analyze results
+
+Examples:
+  kronos                         Launch interactive menu
+  kronos --non-interactive       Show traditional help
+  kronos init my-project         Create a new project
+  kronos backtest                Interactive backtest
+  kronos live                    Interactive live trading`,
+		RunE: rootHandler.Handle,
+	}
+
+	rootCmd.PersistentFlags().Bool("non-interactive", false, "Disable interactive mode")
+
+	// Init command
+	initCmd := &cobra.Command{
+		Use:   "init <name>",
+		Short: "Create a new Kronos project",
+		RunE:  initHandler.Handle,
+	}
+
+	// Live command
+	liveCmd := &cobra.Command{
+		Use:   "live",
+		Short: "Deploy strategies to live trading",
+		RunE:  liveHandler.Handle,
+	}
+	liveCmd.Flags().String("strategy", "", "Strategy name for non-interactive mode")
+	liveCmd.Flags().String("exchange", "", "Exchange for non-interactive mode")
+
+	// Backtest command
+	backtestCmd := &cobra.Command{
+		Use:   "backtest",
+		Short: "Run backtests",
+		RunE:  backtestHandler.Handle,
+	}
+	backtestCmd.Flags().String("config", "", "Path to backtest config file")
+	backtestCmd.Flags().Bool("interactive", false, "Run in interactive mode")
+
+	// Analyze command
+	analyzeCmd := &cobra.Command{
+		Use:   "analyze",
+		Short: "Analyze backtest results",
+		RunE:  analyzeHandler.Handle,
+	}
+	analyzeCmd.Flags().String("path", "./results", "Path to results directory")
+
+	// Version command
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Show version information",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Println("Kronos CLI v0.1.0")
+		},
+	}
+
+	// Add subcommands to root
+	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(liveCmd)
+	rootCmd.AddCommand(backtestCmd)
+	rootCmd.AddCommand(analyzeCmd)
+	rootCmd.AddCommand(versionCmd)
+
+	return &Commands{
+		Root:     rootCmd,
+		Init:     initCmd,
+		Live:     liveCmd,
+		Backtest: backtestCmd,
+		Analyze:  analyzeCmd,
+		Version:  versionCmd,
+	}
+}

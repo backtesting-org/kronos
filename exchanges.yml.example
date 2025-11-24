@@ -1,0 +1,34 @@
+# Global Exchange Configuration
+# Place this file as exchanges.yml at your project root
+# This file stores exchange credentials shared across all strategies
+
+exchanges:
+  # Paradex exchange configuration
+  - name: paradex
+    enabled: true
+    network: mainnet  # mainnet or testnet
+    credentials:
+      account_address: ""
+      eth_private_key: ""
+      l2_private_key: ""  # optional
+
+  # Bybit exchange configuration
+  - name: bybit
+    enabled: true
+    credentials:
+      api_key: ""
+      api_secret: ""
+
+  # Binance exchange configuration
+  - name: binance
+    enabled: false  # Disabled by default
+    credentials:
+      api_key: ""
+      api_secret: ""
+
+  # Kraken exchange configuration
+  - name: kraken
+    enabled: false
+    credentials:
+      api_key: ""
+      api_secret: ""

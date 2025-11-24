@@ -48,3 +48,9 @@ CLAUDE.md
 
 # Debug scripts
 debug/
+
+# macOS
+.DS_Store
+
+# Credentials (global exchange config)
+exchanges.yml
