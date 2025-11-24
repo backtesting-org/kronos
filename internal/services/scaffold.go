@@ -18,3 +18,7 @@ func NewScaffoldService() *ScaffoldService {
 func (s *ScaffoldService) CreateProject(name string) error {
 	return s.scaffolder.CreateProject(name)
 }
+
+func (s *ScaffoldService) CreateProjectWithStrategy(name, strategyExample string) error {
+	return s.scaffolder.CreateProjectWithStrategy(name, strategyExample)
+}

@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"fmt"
-
 	"github.com/backtesting-org/kronos-cli/internal/services"
 	"github.com/spf13/cobra"
 )
@@ -20,9 +18,18 @@ func NewInitHandler(scaffoldService *services.ScaffoldService) *InitHandler {
 
 func (h *InitHandler) Handle(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("project name required")
+		// Run interactive TUI flow
+		strategyExample, projectName, err := RunInitTUI()
+		if err != nil {
+			return err
+		}
+		return h.scaffoldService.CreateProjectWithStrategy(projectName, strategyExample)
 	}
 
 	name := args[0]
 	return h.scaffoldService.CreateProject(name)
+}
+
+func (h *InitHandler) HandleWithStrategy(strategyExample, name string) error {
+	return h.scaffoldService.CreateProjectWithStrategy(name, strategyExample)
 }

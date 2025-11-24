@@ -19,6 +19,7 @@ const (
 	ScreenConfirmation
 	ScreenDeploying
 	ScreenSuccess
+	ScreenEmptyState
 )
 
 const (
@@ -52,11 +53,17 @@ type SelectionModel struct {
 
 // NewSelectionModel creates a new strategy selection model
 func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesConfig) SelectionModel {
+	// If no strategies, start with empty state screen
+	initialScreen := ScreenSelection
+	if len(strategies) == 0 {
+		initialScreen = ScreenEmptyState
+	}
+
 	return SelectionModel{
 		strategies:      strategies,
 		globalExchanges: globalExchanges,
 		cursor:          0,
-		currentScreen:   ScreenSelection,
+		currentScreen:   initialScreen,
 		width:           80,
 		height:          24,
 		fieldInputs:     make(map[string]string),
@@ -76,6 +83,8 @@ func (m SelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch m.currentScreen {
+		case ScreenEmptyState:
+			return m.updateEmptyState(msg)
 		case ScreenSelection:
 			return m.updateSelection(msg)
 		case ScreenExchangeSelection:
@@ -89,6 +98,21 @@ func (m SelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		}
+	}
+
+	return m, nil
+}
+
+func (m SelectionModel) updateEmptyState(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y":
+		// User wants to initialize a new project
+		// Set a flag that will be checked after TUI exits
+		m.err = fmt.Errorf("INIT_PROJECT_REQUESTED")
+		return m, tea.Quit
+
+	case "q", "Q", "ctrl+c", "esc":
+		return m, tea.Quit
 	}
 
 	return m, nil
@@ -340,6 +364,8 @@ func (m SelectionModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 func (m SelectionModel) View() string {
 	switch m.currentScreen {
+	case ScreenEmptyState:
+		return m.renderEmptyState()
 	case ScreenSelection:
 		return m.renderSelection()
 	case ScreenExchangeSelection:
@@ -353,6 +379,56 @@ func (m SelectionModel) View() string {
 	default:
 		return "Unknown screen"
 	}
+}
+
+func (m SelectionModel) renderEmptyState() string {
+	var b strings.Builder
+
+	// Title
+	title := TitleStyle.Render("🚀 KRONOS LIVE TRADING")
+	subtitle := SubtitleStyle.Render("No strategies found")
+
+	b.WriteString("\n\n")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, title))
+	b.WriteString("\n")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, subtitle))
+	b.WriteString("\n\n")
+
+	// Message box
+	message := []string{
+		"",
+		ConfirmFieldStyle.Render("No strategies found in ./strategies/"),
+		"",
+		StrategyMetaStyle.Render("To deploy strategies to live trading, you need to:"),
+		"",
+		StrategyDescStyle.Render("  1. Initialize a new Kronos project"),
+		StrategyDescStyle.Render("  2. Create strategies in ./strategies/ directory"),
+		StrategyDescStyle.Render("  3. Configure exchanges.yml with your credentials"),
+		"",
+		"",
+		ConfirmFieldStyle.Render("Would you like to initialize a new Kronos project here?"),
+		"",
+	}
+
+	b.WriteString(strings.Join(message, "\n"))
+
+	// Options
+	b.WriteString("\n")
+	yesOption := StrategyNameSelectedStyle.Render("Y") + StrategyDescStyle.Render(" Yes, initialize new project")
+	noOption := StrategyMetaStyle.Render("Q") + StrategyDescStyle.Render(" No, quit")
+
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, yesOption))
+	b.WriteString("\n")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, noOption))
+	b.WriteString("\n\n")
+
+	// Help
+	help := HelpStyle.Render("Y Initialize  Q Quit")
+	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
+
+	// Wrap in box
+	boxed := BoxStyle.Render(b.String())
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
 }
 
 func (m SelectionModel) renderSelection() string {
@@ -748,14 +824,16 @@ func RunSelectionTUI() error {
 	// Try to discover strategies from ./strategies directory
 	strategies, err := DiscoverStrategies()
 	if err != nil {
-		return fmt.Errorf("no strategies found: %w\n\nPlease create a strategy in ./strategies/ with a config.yml file", err)
+		// No strategies found, but continue to show empty state
+		strategies = []Strategy{}
 	}
 
-	// Load global exchanges config
+	// Load global exchanges config (or create empty one)
 	exchangesConfigPath := "./exchanges.yml"
 	globalExchanges, err := LoadGlobalExchangesConfig(exchangesConfigPath)
 	if err != nil {
-		return fmt.Errorf("failed to load global exchanges config: %w\n\nPlease create exchanges.yml at the project root", err)
+		// Create empty config
+		globalExchanges = &GlobalExchangesConfig{Exchanges: []ExchangeConfig{}}
 	}
 
 	// Create model
@@ -772,6 +850,10 @@ func RunSelectionTUI() error {
 	// Check for errors in final model
 	if model, ok := finalModel.(SelectionModel); ok {
 		if model.err != nil {
+			// Check if user requested project initialization
+			if model.err.Error() == "INIT_PROJECT_REQUESTED" {
+				return fmt.Errorf("INIT_PROJECT_REQUESTED")
+			}
 			return model.err
 		}
 
