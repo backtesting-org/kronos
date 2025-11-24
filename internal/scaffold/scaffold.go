@@ -107,54 +107,8 @@ func (s *Scaffolder) generateFiles(name, strategyExample string, data ProjectDat
 }
 
 func (s *Scaffolder) generateConfigFiles(name, strategyExample string) error {
-	// Check if config exists in the downloaded files
-	configPath := filepath.Join(name, "config.yml")
-	strategyPath := filepath.Join(name, "strategy.yml")
-
-	hasConfig := false
-	if _, err := os.Stat(configPath); err == nil {
-		hasConfig = true
-	}
-	if _, err := os.Stat(strategyPath); err == nil {
-		hasConfig = true
-	}
-
-	// If no config exists, generate a template with metadata structure
-	if !hasConfig {
-		configYAML := fmt.Sprintf(`# Strategy Metadata
-name: %s
-display_name: "%s Strategy"
-description: "Strategy based on %s example"
-type: %s
-icon: "🎯"
-
-# Strategy Configuration
-exchanges:
-  - binance
-  - bybit
-
-assets:
-  binance:
-    - BTC/USDT
-    - ETH/USDT
-  bybit:
-    - BTC/USDT
-
-parameters:
-  timeframe: 1h
-  # Add strategy-specific parameters here
-
-risk:
-  max_position_size: 1000
-  stop_loss_percent: 2.0
-  take_profit_percent: 5.0
-`, name, name, strategyExample, strategyExample)
-
-		if err := os.WriteFile(configPath, []byte(configYAML), 0644); err != nil {
-			return fmt.Errorf("failed to write config.yml: %w", err)
-		}
-		fmt.Printf("  📝 config.yml\n")
-	}
+	// Note: config.yml comes from the SDK example and contains only metadata
+	// We do NOT generate it here - it's downloaded with the strategy
 
 	// Generate exchanges.yml
 	exchangesYAML := `exchanges:
