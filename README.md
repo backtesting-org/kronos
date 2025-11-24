@@ -89,9 +89,6 @@ Max Drawdown: -2.3%
 ✓ Saved to: results/backtest_2025-10-31.json
 ```
 
-Documentation
-- **[Live Trading Guide](kronos-docs/LIVE_TRADING_GUIDE.md)** - Deploy strategies to live exchanges with interactive TUI
-
 Next Steps
 📖 Read the docs
 
