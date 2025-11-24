@@ -1,8 +1,0 @@
-github.com/backtesting-org/kronos-sdk v0.0.0-20251105060616-72c1aff76142 h1:eby3EeLSDCgwNhHPLdXLfw0A2q9Ij9aBnnO+HxXPisw=
-github.com/backtesting-org/kronos-sdk v0.0.0-20251105060616-72c1aff76142/go.mod h1:jGN8i5PrxvtXFl2V7SW+wchpYEeekAtEF1Q4y91g+Bc=
-github.com/backtesting-org/kronos-sdk v0.0.0-20251105091051-6d28fda61c91 h1:q4BgVwS3rT9DgzWzFW0gltV7J1h+JFj+/TJFjMOg6ws=
-github.com/backtesting-org/kronos-sdk v0.0.0-20251105091051-6d28fda61c91/go.mod h1:P794RxmROm2vDM6amsl+eEPoBptDuKIa821fUo2Qmmo=
-github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
-github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/shopspring/decimal v1.4.0 h1:bxl37RwXBklmTi0C79JfXCEBD1cqqHt0bbgBAGFp81k=
-github.com/shopspring/decimal v1.4.0/go.mod h1:gawqmDU56v4yIKSwfBSFip1HdCCXN8/+DMd9qYNcwME=
