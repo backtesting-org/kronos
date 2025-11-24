@@ -18,6 +18,11 @@ const (
 	ScreenSuccess
 )
 
+const (
+	// visibleStrategies is the maximum number of strategies shown at once
+	visibleStrategies = 3
+)
+
 // SelectionModel is the Bubble Tea model for strategy selection
 type SelectionModel struct {
 	strategies    []Strategy
@@ -87,9 +92,8 @@ func (m SelectionModel) updateSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < len(m.strategies)-1 {
 			m.cursor++
 			// Scroll down if cursor goes below visible area
-			// Show max 3 strategies at a time
-			if m.cursor >= m.scrollOffset+3 {
-				m.scrollOffset = m.cursor - 2
+			if m.cursor >= m.scrollOffset+visibleStrategies {
+				m.scrollOffset = m.cursor - (visibleStrategies - 1)
 			}
 		}
 
@@ -119,9 +123,15 @@ func (m SelectionModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		}
 
 	case "enter":
-		// Proceed to success screen
-		m.currentScreen = ScreenSuccess
-		return m, nil
+		// Validate confirmation input before proceeding
+		if strings.ToUpper(m.confirmInput) == "CONFIRM" {
+			m.currentScreen = ScreenSuccess
+			return m, nil
+		}
+
+	default:
+		// Add typed character to confirmation input
+		m.confirmInput += msg.String()
 	}
 
 	return m, nil
@@ -155,7 +165,7 @@ func (m SelectionModel) renderSelection() string {
 
 	// Strategy list - show only visible window of strategies
 	visibleStart := m.scrollOffset
-	visibleEnd := m.scrollOffset + 3
+	visibleEnd := m.scrollOffset + visibleStrategies
 	if visibleEnd > len(m.strategies) {
 		visibleEnd = len(m.strategies)
 	}
@@ -299,6 +309,12 @@ func (m SelectionModel) renderConfirmation() string {
 		b.WriteString("\n")
 	}
 
+	// Confirmation input prompt
+	b.WriteString("\n")
+	b.WriteString(ConfirmFieldStyle.Render("Type 'CONFIRM' to proceed: "))
+	b.WriteString(ConfirmValueStyle.Render(m.confirmInput))
+	b.WriteString("\n")
+
 	// Help
 	b.WriteString("\n")
 	help := HelpStyle.Render("↵ Proceed  esc Cancel  ctrl+c Quit")
@@ -330,15 +346,30 @@ func (m SelectionModel) renderSuccess() string {
 		"",
 		"Command that would be executed:",
 		"",
-		SubtitleStyle.Render(fmt.Sprintf("  live-trading --exchange %s \\", m.selected.Exchanges[0].Name)),
-		SubtitleStyle.Render(fmt.Sprintf("               --strategy %s/strategy.so \\", m.selected.Path)),
-		SubtitleStyle.Render(fmt.Sprintf("               --config %s/live.yml \\", m.selected.Path)),
-		SubtitleStyle.Render(fmt.Sprintf("               --mode %s", m.selected.Config.Execution.Mode)),
+	}
+
+	// Add exchange info if available
+	if len(m.selected.Exchanges) > 0 {
+		nextSteps = append(nextSteps,
+			SubtitleStyle.Render(fmt.Sprintf("  live-trading --exchange %s \\", m.selected.Exchanges[0].Name)),
+			SubtitleStyle.Render(fmt.Sprintf("               --strategy %s/strategy.so \\", m.selected.Path)),
+			SubtitleStyle.Render(fmt.Sprintf("               --config %s/live.yml \\", m.selected.Path)),
+			SubtitleStyle.Render(fmt.Sprintf("               --mode %s", m.selected.Config.Execution.Mode)),
+		)
+	} else {
+		nextSteps = append(nextSteps,
+			SubtitleStyle.Render(fmt.Sprintf("  live-trading --strategy %s/strategy.so \\", m.selected.Path)),
+			SubtitleStyle.Render(fmt.Sprintf("               --config %s/live.yml \\", m.selected.Path)),
+			SubtitleStyle.Render(fmt.Sprintf("               --mode %s", m.selected.Config.Execution.Mode)),
+		)
+	}
+
+	nextSteps = append(nextSteps,
 		"",
 		"",
 		StrategyMetaStyle.Render("(This is a demo - no actual deployment yet)"),
 		"",
-	}
+	)
 
 	b.WriteString(strings.Join(nextSteps, "\n"))
 
