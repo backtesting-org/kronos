@@ -136,11 +136,11 @@ func DiscoverStrategies() ([]Strategy, error) {
 		soPath := filepath.Join(strategyPath, entry.Name()+".so")
 		if _, err := os.Stat(soPath); os.IsNotExist(err) {
 			// Strategy not built yet, mark as error
-			config.Status = "error"
+			config.Status = string(StatusError)
 		} else {
 			// .so exists, mark as ready
-			if config.Status == "" || config.Status == "error" {
-				config.Status = "ready"
+			if config.Status == "" || config.Status == string(StatusError) {
+				config.Status = string(StatusReady)
 			}
 		}
 
