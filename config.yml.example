@@ -8,19 +8,7 @@ description: My trading strategy description
 status: ready  # ready, running, stopped, error
 
 # Exchanges to use (references exchanges defined in global exchanges.yml)
-exchanges:
-  - paradex
-  - bybit
-
-# Assets per exchange
-# Each exchange can have different assets
-assets:
-  paradex:
-    - BTC-USD-PERP
-    - ETH-USD-PERP
-  bybit:
-    - BTCUSDT
-    - ETHUSDT
+exchanges: binance
 
 # Strategy-specific parameters
 # These are passed to your strategy plugin

@@ -35,6 +35,7 @@ type SelectionModel struct {
 	selected           *Strategy
 	selectedExchange   *ExchangeConfig
 	globalExchanges    *GlobalExchangesConfig  // Global exchanges config
+	compileSvc         CompileService          // Compile service for building strategies
 	currentScreen      Screen
 	confirmInput       string
 	width              int
@@ -52,7 +53,7 @@ type SelectionModel struct {
 }
 
 // NewSelectionModel creates a new strategy selection model
-func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesConfig) SelectionModel {
+func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesConfig, compileSvc CompileService) SelectionModel {
 	// If no strategies, start with empty state screen
 	initialScreen := ScreenSelection
 	if len(strategies) == 0 {
@@ -62,12 +63,38 @@ func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesCo
 	return SelectionModel{
 		strategies:      strategies,
 		globalExchanges: globalExchanges,
+		compileSvc:      compileSvc,
 		cursor:          0,
 		currentScreen:   initialScreen,
 		width:           80,
 		height:          24,
 		fieldInputs:     make(map[string]string),
 	}
+}
+
+// Err returns any error from the model
+func (m SelectionModel) Err() error {
+	return m.err
+}
+
+// Selected returns the selected strategy
+func (m SelectionModel) Selected() *Strategy {
+	return m.selected
+}
+
+// SelectedExchange returns the selected exchange
+func (m SelectionModel) SelectedExchange() *ExchangeConfig {
+	return m.selectedExchange
+}
+
+// CurrentScreen returns the current screen
+func (m SelectionModel) CurrentScreen() Screen {
+	return m.currentScreen
+}
+
+// GlobalExchanges returns the global exchanges config
+func (m SelectionModel) GlobalExchanges() *GlobalExchangesConfig {
+	return m.globalExchanges
 }
 
 func (m SelectionModel) Init() tea.Cmd {
@@ -819,57 +846,3 @@ func (m SelectionModel) renderSuccess() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
 }
 
-// RunSelectionTUI runs the strategy selection TUI
-func RunSelectionTUI() error {
-	// Try to discover strategies from ./strategies directory
-	strategies, err := DiscoverStrategies()
-	if err != nil {
-		// No strategies found, but continue to show empty state
-		strategies = []Strategy{}
-	}
-
-	// Load global exchanges config (or create empty one)
-	exchangesConfigPath := "./exchanges.yml"
-	globalExchanges, err := LoadGlobalExchangesConfig(exchangesConfigPath)
-	if err != nil {
-		// Create empty config
-		globalExchanges = &GlobalExchangesConfig{Exchanges: []ExchangeConfig{}}
-	}
-
-	// Create model
-	m := NewSelectionModel(strategies, globalExchanges)
-
-	// Run the program
-	p := tea.NewProgram(m, tea.WithAltScreen())
-
-	finalModel, err := p.Run()
-	if err != nil {
-		return fmt.Errorf("error running TUI: %w", err)
-	}
-
-	// Check for errors in final model
-	if model, ok := finalModel.(SelectionModel); ok {
-		if model.err != nil {
-			// Check if user requested project initialization
-			if model.err.Error() == "INIT_PROJECT_REQUESTED" {
-				return fmt.Errorf("INIT_PROJECT_REQUESTED")
-			}
-			return model.err
-		}
-
-		// Save credentials back to global exchanges.yml if a strategy was successfully configured
-		if model.selected != nil && model.selectedExchange != nil && model.currentScreen == ScreenSuccess {
-			if err := SaveGlobalExchangesConfig(exchangesConfigPath, model.globalExchanges); err != nil {
-				return fmt.Errorf("failed to save credentials: %w", err)
-			}
-
-			// Execute live trading
-			fmt.Println("\n🚀 Starting live trading...")
-			if err := ExecuteLiveTrading(model.selected, model.selectedExchange); err != nil {
-				return fmt.Errorf("failed to execute live trading: %w", err)
-			}
-		}
-	}
-
-	return nil
-}

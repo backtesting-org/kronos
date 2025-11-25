@@ -40,7 +40,7 @@ type Exchange struct {
 type StrategyConfig struct {
 	Name        string                  `yaml:"name"`
 	Description string                  `yaml:"description"`
-	Status      string                  `yaml:"status"`
+	Status      StrategyStatus          `yaml:"status"`
 	Exchanges   []string                `yaml:"exchanges"`        // Exchange names (references exchanges.yml)
 	Assets      map[string][]string     `yaml:"assets"`           // Assets per exchange
 	Parameters  map[string]interface{}  `yaml:"parameters"`       // Strategy-specific parameters
@@ -135,8 +135,13 @@ func DiscoverStrategies() ([]Strategy, error) {
 		// Check if .so file exists
 		soPath := filepath.Join(strategyPath, entry.Name()+".so")
 		if _, err := os.Stat(soPath); os.IsNotExist(err) {
-			// Strategy not built yet
-			config.Status = "error"
+			// Strategy not built yet, mark as error
+			config.Status = StatusError
+		} else {
+			// .so exists, mark as ready
+			if config.Status == StatusError {
+				config.Status = StatusReady
+			}
 		}
 
 		// Merge strategy config with global exchange configs
@@ -162,7 +167,7 @@ func DiscoverStrategies() ([]Strategy, error) {
 			Name:        config.Name,
 			Path:        strategyPath,
 			Description: config.Description,
-			Status:      parseStatus(config.Status),
+			Status:      config.Status,
 			Exchanges:   exchanges,
 			Config:      config,
 		}
@@ -277,11 +282,23 @@ func parseStatus(status string) StrategyStatus {
 	}
 }
 
+// CompileService interface for compilation operations
+type CompileService interface {
+	CompileStrategy(strategyPath string) error
+	PreCompileStrategies(strategiesDir string)
+}
 
 // ExecuteLiveTrading builds and executes the live-trading CLI command
-func ExecuteLiveTrading(strategy *Strategy, exchange *ExchangeConfig) error {
+func ExecuteLiveTrading(strategy *Strategy, exchange *ExchangeConfig, compileSvc CompileService) error {
 	if strategy == nil || exchange == nil {
 		return fmt.Errorf("strategy and exchange must be provided")
+	}
+
+	// Auto-compile strategy if needed
+	if compileSvc != nil {
+		if err := compileSvc.CompileStrategy(strategy.Path); err != nil {
+			return fmt.Errorf("failed to compile strategy: %w", err)
+		}
 	}
 
 	// Get the .so file path
@@ -291,9 +308,9 @@ func ExecuteLiveTrading(strategy *Strategy, exchange *ExchangeConfig) error {
 		return fmt.Errorf("failed to get absolute path for strategy: %w", err)
 	}
 
-	// Check if .so file exists
+	// Final check if .so file exists (should exist after compilation)
 	if _, err := os.Stat(soPath); os.IsNotExist(err) {
-		return fmt.Errorf("strategy plugin not found: %s (did you build the strategy?)", soPath)
+		return fmt.Errorf("strategy plugin not found after compilation: %s", soPath)
 	}
 
 	// Path to kronos-live binary

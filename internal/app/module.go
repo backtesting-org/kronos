@@ -13,6 +13,7 @@ var Module = fx.Options(
 	fx.Provide(services.NewLiveService),
 	fx.Provide(services.NewBacktestService),
 	fx.Provide(services.NewAnalyzeService),
+	fx.Provide(services.NewCompileService),
 
 	// Handlers
 	fx.Provide(handlers.NewInitHandler),
