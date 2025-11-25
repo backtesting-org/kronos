@@ -81,6 +81,10 @@ var (
 				Foreground(ColorDanger).
 				Bold(true)
 
+	StatusErrorStyle = lipgloss.NewStyle().
+				Foreground(ColorDanger).
+				MarginTop(1)
+
 	// Help text
 	HelpStyle = lipgloss.NewStyle().
 			Foreground(ColorMuted).

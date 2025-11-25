@@ -21,7 +21,7 @@ func NewLiveService(compileSvc *CompileService) *LiveService {
 func (s *LiveService) RunSelectionTUI() error {
 	// Pre-compile all strategies BEFORE showing the TUI
 	fmt.Println("🔍 Checking strategies...")
-	s.compileSvc.PreCompileStrategies("./strategies")
+	compileErrors := s.compileSvc.PreCompileStrategies("./strategies")
 	fmt.Println()
 
 	// Try to discover strategies from ./strategies directory
@@ -29,6 +29,14 @@ func (s *LiveService) RunSelectionTUI() error {
 	if err != nil {
 		// No strategies found, but continue to show empty state
 		strategies = []live.Strategy{}
+	}
+
+	// Apply compilation errors to strategies
+	for i := range strategies {
+		if compErr, hasError := compileErrors[strategies[i].Name]; hasError {
+			strategies[i].Status = live.StatusError
+			strategies[i].Error = compErr.Error()
+		}
 	}
 
 	// Load global exchanges config (or create empty one)

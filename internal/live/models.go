@@ -17,6 +17,7 @@ type Strategy struct {
 	Exchanges   []Exchange
 	Status      StrategyStatus
 	Config      *StrategyConfig
+	Error       string // Error message if status is StatusError
 }
 
 // StrategyStatus represents the current status of a strategy
@@ -116,27 +117,45 @@ func DiscoverStrategies() ([]Strategy, error) {
 			continue
 		}
 
-		strategyPath := filepath.Join(strategiesDir, entry.Name())
+		strategyName := entry.Name()
+		strategyPath := filepath.Join(strategiesDir, strategyName)
 		configPath := filepath.Join(strategyPath, "config.yml")
+
+		// Initialize a strategy with error state by default
+		var strategy Strategy
+		var config *StrategyConfig
 
 		// Check if config.yml exists
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			// Skip directories without config.yml
+			// Skip directories without config.yml (not a valid strategy)
 			continue
 		}
 
 		// Load and parse the config
-		config, err := LoadStrategyConfig(configPath)
+		config, err = LoadStrategyConfig(configPath)
 		if err != nil {
-			// Skip strategies with invalid config
+			// Config is invalid, but we still want to show the strategy with an error
+			strategy = Strategy{
+				Name:   strategyName,
+				Path:   strategyPath,
+				Status: StatusError,
+				Error:  fmt.Sprintf("Invalid config: %s", err.Error()),
+				Config: &StrategyConfig{
+					Name:   strategyName,
+					Status: StatusError,
+				},
+			}
+			strategies = append(strategies, strategy)
 			continue
 		}
 
 		// Check if .so file exists
-		soPath := filepath.Join(strategyPath, entry.Name()+".so")
+		soPath := filepath.Join(strategyPath, strategyName+".so")
+		errorMsg := ""
 		if _, err := os.Stat(soPath); os.IsNotExist(err) {
 			// Strategy not built yet, mark as error
 			config.Status = StatusError
+			errorMsg = fmt.Sprintf("Strategy not compiled - missing %s.so file", strategyName)
 		} else {
 			// .so exists, mark as ready
 			if config.Status == StatusError {
@@ -163,13 +182,14 @@ func DiscoverStrategies() ([]Strategy, error) {
 		}
 
 		// Convert config to Strategy
-		strategy := Strategy{
+		strategy = Strategy{
 			Name:        config.Name,
 			Path:        strategyPath,
 			Description: config.Description,
 			Status:      config.Status,
 			Exchanges:   exchanges,
 			Config:      config,
+			Error:       errorMsg,
 		}
 
 		strategies = append(strategies, strategy)
@@ -285,7 +305,7 @@ func parseStatus(status string) StrategyStatus {
 // CompileService interface for compilation operations
 type CompileService interface {
 	CompileStrategy(strategyPath string) error
-	PreCompileStrategies(strategiesDir string)
+	PreCompileStrategies(strategiesDir string) map[string]error
 }
 
 // ExecuteLiveTrading builds and executes the live-trading CLI command
