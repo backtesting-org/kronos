@@ -40,7 +40,7 @@ type Exchange struct {
 type StrategyConfig struct {
 	Name        string                  `yaml:"name"`
 	Description string                  `yaml:"description"`
-	Status      string                  `yaml:"status"`
+	Status      StrategyStatus          `yaml:"status"`
 	Exchanges   []string                `yaml:"exchanges"`        // Exchange names (references exchanges.yml)
 	Assets      map[string][]string     `yaml:"assets"`           // Assets per exchange
 	Parameters  map[string]interface{}  `yaml:"parameters"`       // Strategy-specific parameters
@@ -136,11 +136,11 @@ func DiscoverStrategies() ([]Strategy, error) {
 		soPath := filepath.Join(strategyPath, entry.Name()+".so")
 		if _, err := os.Stat(soPath); os.IsNotExist(err) {
 			// Strategy not built yet, mark as error
-			config.Status = string(StatusError)
+			config.Status = StatusError
 		} else {
 			// .so exists, mark as ready
-			if config.Status == "" || config.Status == string(StatusError) {
-				config.Status = string(StatusReady)
+			if config.Status == StatusError {
+				config.Status = StatusReady
 			}
 		}
 
@@ -167,7 +167,7 @@ func DiscoverStrategies() ([]Strategy, error) {
 			Name:        config.Name,
 			Path:        strategyPath,
 			Description: config.Description,
-			Status:      parseStatus(config.Status),
+			Status:      config.Status,
 			Exchanges:   exchanges,
 			Config:      config,
 		}
