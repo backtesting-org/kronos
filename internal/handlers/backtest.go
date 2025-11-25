@@ -29,5 +29,7 @@ func (h *BacktestHandler) Handle(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// TODO: implement strategies discovery and compilation here
+
 	return h.backtestService.ExecuteBacktest(cfg)
 }

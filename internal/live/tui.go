@@ -35,6 +35,7 @@ type SelectionModel struct {
 	selected           *Strategy
 	selectedExchange   *ExchangeConfig
 	globalExchanges    *GlobalExchangesConfig  // Global exchanges config
+	compileSvc         CompileService          // Compile service for building strategies
 	currentScreen      Screen
 	confirmInput       string
 	width              int
@@ -52,7 +53,7 @@ type SelectionModel struct {
 }
 
 // NewSelectionModel creates a new strategy selection model
-func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesConfig) SelectionModel {
+func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesConfig, compileSvc CompileService) SelectionModel {
 	// If no strategies, start with empty state screen
 	initialScreen := ScreenSelection
 	if len(strategies) == 0 {
@@ -62,6 +63,7 @@ func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesCo
 	return SelectionModel{
 		strategies:      strategies,
 		globalExchanges: globalExchanges,
+		compileSvc:      compileSvc,
 		cursor:          0,
 		currentScreen:   initialScreen,
 		width:           80,
@@ -820,7 +822,15 @@ func (m SelectionModel) renderSuccess() string {
 }
 
 // RunSelectionTUI runs the strategy selection TUI
-func RunSelectionTUI() error {
+func RunSelectionTUI(compileSvc CompileService) error {
+	// First, pre-compile all strategies BEFORE showing the TUI
+	// This ensures users see compilation output
+	fmt.Println("🔍 Checking strategies...")
+	if compileSvc != nil {
+		compileSvc.PreCompileStrategies("./strategies")
+	}
+	fmt.Println()
+
 	// Try to discover strategies from ./strategies directory
 	strategies, err := DiscoverStrategies()
 	if err != nil {
@@ -837,7 +847,7 @@ func RunSelectionTUI() error {
 	}
 
 	// Create model
-	m := NewSelectionModel(strategies, globalExchanges)
+	m := NewSelectionModel(strategies, globalExchanges, compileSvc)
 
 	// Run the program
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -865,7 +875,7 @@ func RunSelectionTUI() error {
 
 			// Execute live trading
 			fmt.Println("\n🚀 Starting live trading...")
-			if err := ExecuteLiveTrading(model.selected, model.selectedExchange); err != nil {
+			if err := ExecuteLiveTrading(model.selected, model.selectedExchange, model.compileSvc); err != nil {
 				return fmt.Errorf("failed to execute live trading: %w", err)
 			}
 		}
