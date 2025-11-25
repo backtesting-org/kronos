@@ -169,6 +169,12 @@ func (m SelectionModel) updateSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "enter", " ":
+		// Check if the selected strategy has an error
+		if m.strategies[m.cursor].Status == StatusError {
+			// Don't allow selection of strategies with errors
+			return m, nil
+		}
+
 		// Select the current strategy
 		m.selected = &m.strategies[m.cursor]
 
@@ -526,6 +532,12 @@ func (m SelectionModel) renderSelection() string {
 			meta,
 		)
 
+		// Add error message if strategy has an error and is selected
+		if strategy.Status == StatusError && strategy.Error != "" && m.cursor == i {
+			errorMsg := StatusErrorStyle.Render(fmt.Sprintf("⚠ Error: %s", strategy.Error))
+			itemContent += "\n" + errorMsg
+		}
+
 		var item string
 		if m.cursor == i {
 			item = StrategyItemSelectedStyle.Render(cursor + itemContent)
@@ -546,6 +558,12 @@ func (m SelectionModel) renderSelection() string {
 
 	// Help text
 	help := HelpStyle.Render("↑↓/jk Navigate  ↵ Select  q Quit")
+
+	// Check if current strategy has error to show additional help
+	if m.cursor < len(m.strategies) && m.strategies[m.cursor].Status == StatusError {
+		help += "\n" + StatusErrorStyle.Render("  ⚠ Cannot select strategy with errors")
+	}
+
 	b.WriteString("\n")
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
 

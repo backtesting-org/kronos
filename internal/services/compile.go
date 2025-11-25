@@ -22,7 +22,7 @@ func (s *CompileService) CompileStrategy(strategyPath string) error {
 
 	// Check if strategy.go exists
 	if _, err := os.Stat(strategyGoPath); os.IsNotExist(err) {
-		return fmt.Errorf("strategy.go not found in %s", strategyPath)
+		return fmt.Errorf("strategy.go not found")
 	}
 
 	// Check if .so exists and is up-to-date
@@ -44,8 +44,9 @@ func (s *CompileService) CompileStrategy(strategyPath string) error {
 	fmt.Printf("  📦 Downloading dependencies...\n")
 	tidyCmd := exec.Command("go", "mod", "tidy")
 	tidyCmd.Dir = strategyPath
-	if err := tidyCmd.Run(); err != nil {
-		return fmt.Errorf("failed to download dependencies for %s: %w", strategyName, err)
+	tidyOutput, err := tidyCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to download dependencies: %s", string(tidyOutput))
 	}
 
 	// Now compile the plugin
@@ -54,11 +55,12 @@ func (s *CompileService) CompileStrategy(strategyPath string) error {
 	outputFileName := strategyName + ".so"
 	cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", outputFileName, "strategy.go")
 	cmd.Dir = strategyPath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to compile %s: %w", strategyName, err)
+	// Capture both stdout and stderr to show detailed error messages
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Return the compilation error with full output
+		return fmt.Errorf("compilation failed: %s", string(output))
 	}
 
 	fmt.Printf("✅ Compiled %s.so successfully\n\n", strategyName)
@@ -66,11 +68,14 @@ func (s *CompileService) CompileStrategy(strategyPath string) error {
 }
 
 // PreCompileStrategies scans and compiles all strategies in the strategies directory
-func (s *CompileService) PreCompileStrategies(strategiesDir string) {
+// Returns a map of strategy names to compilation errors (if any)
+func (s *CompileService) PreCompileStrategies(strategiesDir string) map[string]error {
+	errors := make(map[string]error)
+
 	// Check if strategies directory exists
 	entries, err := os.ReadDir(strategiesDir)
 	if err != nil {
-		return // No strategies directory, skip
+		return errors // No strategies directory, return empty map
 	}
 
 	for _, entry := range entries {
@@ -78,7 +83,8 @@ func (s *CompileService) PreCompileStrategies(strategiesDir string) {
 			continue
 		}
 
-		strategyPath := filepath.Join(strategiesDir, entry.Name())
+		strategyName := entry.Name()
+		strategyPath := filepath.Join(strategiesDir, strategyName)
 		configPath := filepath.Join(strategyPath, "config.yml")
 
 		// Only compile if config.yml exists
@@ -86,9 +92,13 @@ func (s *CompileService) PreCompileStrategies(strategiesDir string) {
 			continue
 		}
 
-		// Try to compile (errors are printed but not fatal)
-		s.CompileStrategy(strategyPath)
+		// Try to compile and capture any errors
+		if err := s.CompileStrategy(strategyPath); err != nil {
+			errors[strategyName] = err
+		}
 	}
+
+	return errors
 }
 
 // IsCompiled checks if a strategy has a compiled .so file
