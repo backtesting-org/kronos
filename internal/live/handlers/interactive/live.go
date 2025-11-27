@@ -11,6 +11,7 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/live/types"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -136,7 +137,11 @@ func (m SelectionModel) updateEmptyState(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y":
 		// User wants to initialize a new project
-		// Set a flag that will be checked after TUI exits
+		if m.router != nil {
+			// Navigate to init using router
+			return m, m.router.Navigate(router.RouteInit)
+		}
+		// Fallback: set error flag that will be checked after TUI exits
 		m.err = fmt.Errorf("INIT_PROJECT_REQUESTED")
 		return m, tea.Quit
 

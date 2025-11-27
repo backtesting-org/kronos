@@ -2,6 +2,7 @@ package interactive
 
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
+	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 )
 
 // Screen represents which screen we're on
@@ -27,4 +28,5 @@ type SelectionModel struct {
 	width         int
 	height        int
 	err           error
+	router        router.Router
 }
