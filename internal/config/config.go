@@ -3,58 +3,41 @@ package config
 import (
 	"fmt"
 	"os"
-	"time"
+	"sync"
 
 	"github.com/spf13/viper"
 )
 
-// Config represents the kronos.yml configuration
-type Config struct {
-	Version  string         `mapstructure:"version"`
-	Backtest BacktestConfig `mapstructure:"backtest"`
-	Live     LiveConfig     `mapstructure:"live"`
+type Configuration interface {
+	LoadKronosConfig() (*Config, error)
+	LoadStrategyConfig(path string) (*StrategyConfig, error)
+	GetExchangeCredentials() (*ExchangeCredentials, error)
 }
 
-// BacktestConfig holds backtest configuration
-type BacktestConfig struct {
-	Strategy   string                 `mapstructure:"strategy"`
-	Exchange   string                 `mapstructure:"exchange"`
-	Pair       string                 `mapstructure:"pair"`
-	Timeframe  TimeframeConfig        `mapstructure:"timeframe"`
-	Parameters map[string]interface{} `mapstructure:"parameters"`
-	Execution  ExecutionConfig        `mapstructure:"execution"`
-	Output     OutputConfig           `mapstructure:"output"`
+type configuration struct {
+	kronosConfigPath string
+	config           *Config
+	credentials      *ExchangeCredentials
+	mu               sync.RWMutex
 }
 
-// TimeframeConfig defines the backtest time period
-type TimeframeConfig struct {
-	Start string `mapstructure:"start"`
-	End   string `mapstructure:"end"`
+func NewConfiguration() Configuration {
+	return &configuration{
+		kronosConfigPath: "kronos.yml",
+	}
 }
 
-// ExecutionConfig defines execution parameters
-type ExecutionConfig struct {
-}
+// LoadKronosConfig loads the Kronos configuration from the specified file path
+func (c *configuration) LoadKronosConfig() (*Config, error) {
+	if c.config != nil {
+		return c.config, nil
+	}
+	if !c.fileExists(c.kronosConfigPath) {
+		return nil, fmt.Errorf("kronos instance not found, please run 'kronos init' to create one")
+	}
 
-// OutputConfig defines output settings
-type OutputConfig struct {
-	Format      string `mapstructure:"format"`
-	SaveResults bool   `mapstructure:"save_results"`
-	ResultsDir  string `mapstructure:"results_dir"`
-}
-
-// LiveConfig holds live trading configuration
-type LiveConfig struct {
-	Enabled   bool   `mapstructure:"enabled"`
-	Exchange  string `mapstructure:"exchange"`
-	APIKey    string `mapstructure:"api_key"`
-	APISecret string `mapstructure:"api_secret"`
-}
-
-// LoadConfig loads configuration from a YAML file
-func LoadConfig(path string) (*Config, error) {
 	v := viper.New()
-	v.SetConfigFile(path)
+	v.SetConfigFile(c.kronosConfigPath)
 	v.SetConfigType("yaml")
 
 	// Enable environment variable substitution
@@ -69,37 +52,52 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Cache the config
+	c.config = &cfg
+
+	// Cache exchange credentials
+	c.credentials = &ExchangeCredentials{
+		Exchanges: cfg.Exchanges,
+	}
+
+	return c.config, nil
+}
+
+func (c *configuration) LoadStrategyConfig(path string) (*StrategyConfig, error) {
+	if !c.fileExists(path) {
+		return nil, fmt.Errorf("strategy config file does not exist: %s", path)
+	}
+
+	v := viper.New()
+	v.SetConfigFile(path)
+	v.SetConfigType("yaml")
+
+	// Enable environment variable substitution
+	if err := v.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("failed to read strategy config file: %w", err)
+	}
+
+	var cfg StrategyConfig
+	if err := v.Unmarshal(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal strategy config: %w", err)
+	}
+
 	return &cfg, nil
 }
 
-// Validate validates the configuration
-func (c *Config) Validate() error {
-	if c.Backtest.Strategy == "" {
-		return fmt.Errorf("strategy is required")
+// GetExchangeCredentials returns the cached exchange credentials from kronos.yml
+// If not loaded yet, it will load the kronos config first
+func (c *configuration) GetExchangeCredentials() (*ExchangeCredentials, error) {
+	if c.credentials != nil {
+		return c.credentials, nil
 	}
 
-	if c.Backtest.Exchange == "" {
-		return fmt.Errorf("exchange is required")
+	// Load the full config which will also cache credentials
+	if _, err := c.LoadKronosConfig(); err != nil {
+		return nil, err
 	}
 
-	if c.Backtest.Pair == "" {
-		return fmt.Errorf("pair is required")
-	}
-
-	// Validate timeframe dates
-	if c.Backtest.Timeframe.Start != "" {
-		if _, err := time.Parse("2006-01-02", c.Backtest.Timeframe.Start); err != nil {
-			return fmt.Errorf("invalid start date format (use YYYY-MM-DD): %w", err)
-		}
-	}
-
-	if c.Backtest.Timeframe.End != "" {
-		if _, err := time.Parse("2006-01-02", c.Backtest.Timeframe.End); err != nil {
-			return fmt.Errorf("invalid end date format (use YYYY-MM-DD): %w", err)
-		}
-	}
-
-	return nil
+	return c.credentials, nil
 }
 
 // DefaultConfig returns a default configuration
@@ -134,7 +132,7 @@ func DefaultConfig() *Config {
 }
 
 // FileExists checks if the config file exists
-func FileExists(path string) bool {
+func (c *configuration) fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }

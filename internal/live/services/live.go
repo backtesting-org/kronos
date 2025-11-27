@@ -42,7 +42,7 @@ func (s *liveService) LoadConnectors() (types.Connectors, error) {
 	s.logger.Info("Loading exchange configuration...")
 	connectors, err := s.config.LoadExchangeCredentials()
 	if err != nil {
-		return types.Connectors{}, fmt.Errorf("failed to load connectors: %w", err)
+		return types.Connectors{}, err
 	}
 	return connectors, nil
 }

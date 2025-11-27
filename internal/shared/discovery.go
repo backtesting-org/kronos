@@ -1,9 +1,8 @@
 package shared
 
 import (
-	"fmt"
-
 	"github.com/backtesting-org/kronos-cli/internal/live/types"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 )
 
 type StrategyDiscovery interface {
@@ -12,20 +11,24 @@ type StrategyDiscovery interface {
 
 type strategyDiscovery struct {
 	compileSvc CompileService
+	logger     logging.ApplicationLogger
 }
 
-func NewStrategyDiscovery(compileSvc CompileService) StrategyDiscovery {
+func NewStrategyDiscovery(
+	compileSvc CompileService,
+	logger logging.ApplicationLogger,
+) StrategyDiscovery {
 	return &strategyDiscovery{
 		compileSvc: compileSvc,
+		logger:     logger,
 	}
 }
 
 // DiscoverStrategies finds and compiles strategies, returns them with compilation status
 func (s *strategyDiscovery) DiscoverStrategies() ([]types.Strategy, error) {
 	// Pre-compile all strategies
-	fmt.Println("🔍 Checking strategies...")
+	s.logger.Info("Discovering strategies")
 	compileErrors := s.compileSvc.PreCompileStrategies("./strategies")
-	fmt.Println()
 
 	// Discover strategies
 	strategies, err := types.DiscoverStrategies()
