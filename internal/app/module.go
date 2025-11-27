@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/backtesting-org/kronos-cli/internal/backtesting"
+	"github.com/backtesting-org/kronos-cli/internal/config"
 	"github.com/backtesting-org/kronos-cli/internal/handlers"
 	"github.com/backtesting-org/kronos-cli/internal/live"
 	"github.com/backtesting-org/kronos-cli/internal/setup"
@@ -18,4 +19,5 @@ var Module = fx.Options(
 	shared.Module,
 	handlers.Module,
 	pkg.Module,
+	config.Module,
 )

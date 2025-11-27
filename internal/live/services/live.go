@@ -13,20 +13,20 @@ import (
 
 // liveService orchestrates live trading by coordinating other services
 type liveService struct {
-	kronos   settings.Settings
+	settings settings.Configuration
 	compile  shared.CompileService
 	discover shared.StrategyDiscovery
 	logger   logging.ApplicationLogger
 }
 
 func NewLiveService(
-	kronos settings.Settings,
+	kronos settings.Configuration,
 	compileSvc shared.CompileService,
 	discovery shared.StrategyDiscovery,
 	logger logging.ApplicationLogger,
 ) types.LiveService {
 	return &liveService{
-		kronos:   kronos,
+		settings: kronos,
 		compile:  compileSvc,
 		discover: discovery,
 		logger:   logger,
@@ -44,7 +44,18 @@ func (s *liveService) FindStrategies() ([]strategy.Strategy, error) {
 }
 
 func (s *liveService) FindConnectors() []settings.Connector {
-	return s.kronos.Connectors
+	setting, err := s.settings.LoadSettings()
+
+	if err != nil {
+		s.logger.Error("Failed to load settings", "error", err)
+		return []settings.Connector{}
+	}
+
+	if setting == nil {
+		return []settings.Connector{}
+	}
+
+	return setting.Connectors
 }
 
 // ValidateCredentials validates exchange credentials

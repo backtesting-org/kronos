@@ -6,7 +6,7 @@ type Configuration interface {
 	GetEnabledConnectors() ([]Connector, error)
 }
 
-// Settings represents the main configuration structure
+// Settings represents the main settings structure
 type Settings struct {
 	Version    string         `mapstructure:"version"`
 	Backtest   BacktestConfig `mapstructure:"backtest"`
@@ -22,7 +22,7 @@ type Connector struct {
 	Credentials map[string]string `yaml:"credentials,omitempty"`
 }
 
-// BacktestConfig holds backtest configuration
+// BacktestConfig holds backtest settings
 type BacktestConfig struct {
 	Strategy   string                 `mapstructure:"strategy"`
 	Exchange   string                 `mapstructure:"exchange"`
@@ -50,7 +50,7 @@ type OutputConfig struct {
 	ResultsDir  string `mapstructure:"results_dir"`
 }
 
-// LiveConfig holds live trading configuration
+// LiveConfig holds live trading settings
 type LiveConfig struct {
 	Enabled   bool   `mapstructure:"enabled"`
 	Exchange  string `mapstructure:"exchange"`
@@ -58,7 +58,7 @@ type LiveConfig struct {
 	APISecret string `mapstructure:"api_secret"`
 }
 
-// Validate validates the configuration
+// Validate validates the settings
 //func (c *Config) Validate() error {
 //	if c.Backtest.Strategy == "" {
 //		return fmt.Errorf("strategy is required")

@@ -7,19 +7,19 @@ import (
 	"github.com/spf13/viper"
 )
 
-type configuration struct {
+type settings struct {
 	SettingsPath string
 	settings     *Settings
 }
 
 func NewConfiguration() Configuration {
-	return &configuration{
+	return &settings{
 		SettingsPath: "kronos.yml",
 	}
 }
 
-// LoadSettings loads the Settings configuration from the specified file path
-func (c *configuration) LoadSettings() (*Settings, error) {
+// LoadSettings loads the Settings settings from the specified file path
+func (c *settings) LoadSettings() (*Settings, error) {
 	if c.settings != nil {
 		return c.settings, nil
 	}
@@ -52,7 +52,7 @@ func (c *configuration) LoadSettings() (*Settings, error) {
 
 // GetConnectors returns the cached exchange credentials from settings.yml
 // If not loaded yet, it will load the settings config first
-func (c *configuration) GetConnectors() ([]Connector, error) {
+func (c *settings) GetConnectors() ([]Connector, error) {
 	if c.settings != nil {
 		return c.settings.Connectors, nil
 	}
@@ -66,7 +66,7 @@ func (c *configuration) GetConnectors() ([]Connector, error) {
 }
 
 // GetEnabledConnectors returns all enabled connectors
-func (c *configuration) GetEnabledConnectors() ([]Connector, error) {
+func (c *settings) GetEnabledConnectors() ([]Connector, error) {
 	if c.settings != nil {
 		return c.settings.Connectors, nil
 	}
@@ -82,12 +82,12 @@ func (c *configuration) GetEnabledConnectors() ([]Connector, error) {
 }
 
 // FileExists checks if the config file exists
-func (c *configuration) fileExists(path string) bool {
+func (c *settings) fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
 
-// DefaultConfig returns a default configuration
+// DefaultConfig returns a default settings
 //func DefaultConfig() *config.Config {
 //	return &config.Config{
 //		Version: "1.0",
