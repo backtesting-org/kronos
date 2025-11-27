@@ -1,33 +1,86 @@
-package handlers
+package interactive
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/backtesting-org/kronos-cli/internal/live/types"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Screen represents which screen we're on
-type Screen int
+type LiveInteractive interface {
+	Run() error
+}
 
-const (
-	ScreenSelection Screen = iota
-	ScreenExchangeSelection
-	ScreenCredentials
-	ScreenConfirmation
-	ScreenDeploying
-	ScreenSuccess
-	ScreenEmptyState
-)
+type live struct {
+	service types.LiveService
+}
 
-const (
-	// visibleStrategies is the maximum number of strategies shown at once
-	visibleStrategies = 3
-)
+func NewTUIHandler(service types.LiveService) LiveInteractive {
+	return &live{
+		service: service,
+	}
+}
+
+// Run executes the TUI flow - this is where Tea orchestration lives
+func (l *live) Run() error {
+	// 1. Load data from service
+	connectors, err := l.service.LoadConnectors()
+	if err != nil {
+		return err
+	}
+
+	strategies, err := l.service.DiscoverStrategies()
+	if err != nil {
+		return err
+	}
+
+	model := NewSelectionModel(strategies, connectors)
+	program := tea.NewProgram(model, tea.WithAltScreen())
+
+	finalModel, err := program.Run()
+	if err != nil {
+		return fmt.Errorf("TUI error: %w", err)
+	}
+
+	// 3. Handle result
+	result, ok := finalModel.(SelectionModel)
+	if !ok {
+		return fmt.Errorf("unexpected model type")
+	}
+
+	if result.Err() != nil {
+		return result.Err()
+	}
+
+	// 4. Execute if user selected something
+	if result.Selected() != nil && result.SelectedExchange() != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Handle Ctrl+C
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		go func() {
+			<-sigChan
+			fmt.Println("\n\n🛑 Stopping strategy...")
+			cancel()
+		}()
+
+		return l.service.ExecuteStrategy(ctx, result.Selected(), result.SelectedExchange())
+	}
+
+	return nil
+}
 
 // SelectionModel is the Bubble Tea model for strategy selection (pure view layer)
 type SelectionModel struct {
@@ -38,19 +91,19 @@ type SelectionModel struct {
 	selectedExchange *types.ExchangeConfig
 	connectors       types.Connectors
 	currentScreen    Screen
-	confirmInput     string
 	width            int
 	height           int
 	err              error
 
-	// Connectors selection
+	// Exchange selection
 	exchangeCursor int
 
 	// Credential input fields
-	credentialFields []string
+	credentialInputs []textinput.Model
 	currentField     int
-	fieldInputs      map[string]string
-	showPassword     bool
+
+	// Confirmation input
+	confirmInput textinput.Model
 }
 
 // NewSelectionModel creates a new strategy selection model (view only)
@@ -68,7 +121,6 @@ func NewSelectionModel(strategies []types.Strategy, connectors types.Connectors)
 		currentScreen: initialScreen,
 		width:         80,
 		height:        24,
-		fieldInputs:   make(map[string]string),
 	}
 }
 
@@ -228,61 +280,60 @@ func (m SelectionModel) updateExchangeSelection(msg tea.KeyMsg) (tea.Model, tea.
 }
 
 func (m SelectionModel) updateCredentials(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg.String() {
 	case "esc":
-		// Go back to exchange selection or strategy selection
 		if len(m.selected.Config.Exchanges) > 1 {
 			m.currentScreen = ScreenExchangeSelection
 		} else {
 			m.currentScreen = ScreenSelection
 		}
 		m.selectedExchange = nil
-		m.fieldInputs = make(map[string]string)
+		m.credentialInputs = nil
 
 	case "ctrl+c":
 		return m, tea.Quit
 
 	case "tab", "down":
-		// Move to next field
-		if m.currentField < len(m.credentialFields)-1 {
+		if m.currentField < len(m.credentialInputs)-1 {
 			m.currentField++
+			m.credentialInputs[m.currentField].Focus()
 		}
 
 	case "shift+tab", "up":
-		// Move to previous field
 		if m.currentField > 0 {
 			m.currentField--
-		}
-
-	case "backspace":
-		// Delete character from current field
-		currentFieldName := m.credentialFields[m.currentField]
-		if len(m.fieldInputs[currentFieldName]) > 0 {
-			m.fieldInputs[currentFieldName] = m.fieldInputs[currentFieldName][:len(m.fieldInputs[currentFieldName])-1]
+			m.credentialInputs[m.currentField].Focus()
 		}
 
 	case "enter":
-		// Move to next field, or if on last field, proceed to confirmation
-		if m.currentField < len(m.credentialFields)-1 {
+		if m.currentField < len(m.credentialInputs)-1 {
 			m.currentField++
+			m.credentialInputs[m.currentField].Focus()
 		} else {
-			// Save credentials to the exchange config
-			for field, value := range m.fieldInputs {
-				if m.selectedExchange != nil && m.selectedExchange.Credentials != nil {
-					m.selectedExchange.Credentials[field] = value
+			// Save credentials and proceed
+			for _, input := range m.credentialInputs {
+				fieldName := getFieldNameFromPlaceholder(input.Placeholder)
+				if m.selectedExchange.Credentials == nil {
+					m.selectedExchange.Credentials = make(map[string]string)
 				}
+				m.selectedExchange.Credentials[fieldName] = input.Value()
 			}
+
+			// Initialize confirm input
+			m.confirmInput = textinput.New()
+			m.confirmInput.Placeholder = "Type CONFIRM"
+			m.confirmInput.Focus()
 			m.currentScreen = ScreenConfirmation
-			m.confirmInput = ""
 		}
 
 	default:
-		// Add typed character to current field input
-		currentFieldName := m.credentialFields[m.currentField]
-		m.fieldInputs[currentFieldName] += msg.String()
+		// Update the current text input
+		m.credentialInputs[m.currentField], cmd = m.credentialInputs[m.currentField].Update(msg)
 	}
 
-	return m, nil
+	return m, cmd
 }
 
 // getAvailableExchangesForStrategy returns the list of exchange configs available for the selected strategy
@@ -306,71 +357,86 @@ func (m *SelectionModel) getAvailableExchangesForStrategy() []*types.ExchangeCon
 	return available
 }
 
-// setupCredentialFields determines what credential fields to show in the UI
-// Pure view logic - just maps exchange type to field names
+// getFieldNameFromPlaceholder extracts the field name from the placeholder text
+func getFieldNameFromPlaceholder(placeholder string) string {
+	// Placeholder format: "Enter your api_key"
+	parts := strings.Fields(placeholder)
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return ""
+}
+
+// setupCredentialFields creates textinput models for credential entry
 func (m *SelectionModel) setupCredentialFields() {
 	if m.selectedExchange == nil {
 		return
 	}
 
 	m.currentField = 0
-	m.fieldInputs = make(map[string]string)
+	m.credentialInputs = []textinput.Model{}
 
 	// Map exchange type to credential field names
+	var fields []string
 	switch m.selectedExchange.Name {
 	case "paradex":
-		m.credentialFields = []string{"account_address", "eth_private_key", "l2_private_key"}
+		fields = []string{"account_address", "eth_private_key", "l2_private_key"}
 	case "bybit", "binance", "kraken":
-		m.credentialFields = []string{"api_key", "api_secret"}
+		fields = []string{"api_key", "api_secret"}
 	default:
-		m.credentialFields = []string{"api_key", "api_secret"}
+		fields = []string{"api_key", "api_secret"}
 	}
 
-	// Pre-fill with existing values if any
-	if m.selectedExchange.Credentials != nil {
-		for _, field := range m.credentialFields {
+	// Create textinput for each field
+	for i, field := range fields {
+		ti := textinput.New()
+		ti.Placeholder = fmt.Sprintf("Enter your %s", field)
+		ti.CharLimit = 256
+
+		// Mask sensitive fields
+		if strings.Contains(field, "key") || strings.Contains(field, "secret") {
+			ti.EchoMode = textinput.EchoPassword
+			ti.EchoCharacter = '•'
+		}
+
+		// Pre-fill with existing value if available
+		if m.selectedExchange.Credentials != nil {
 			if val, ok := m.selectedExchange.Credentials[field]; ok {
-				m.fieldInputs[field] = val
-			} else {
-				m.fieldInputs[field] = ""
+				ti.SetValue(val)
 			}
 		}
-	} else {
-		// Initialize empty values
-		for _, field := range m.credentialFields {
-			m.fieldInputs[field] = ""
+
+		// Focus first field
+		if i == 0 {
+			ti.Focus()
 		}
+
+		m.credentialInputs = append(m.credentialInputs, ti)
 	}
 }
 
 func (m SelectionModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg.String() {
 	case "esc":
-		// Go back to credentials screen
 		m.currentScreen = ScreenCredentials
-		m.confirmInput = ""
+		return m, nil
 
 	case "ctrl+c":
 		return m, tea.Quit
 
-	case "backspace":
-		if len(m.confirmInput) > 0 {
-			m.confirmInput = m.confirmInput[:len(m.confirmInput)-1]
-		}
-
 	case "enter":
-		// Validate confirmation input before proceeding
-		if strings.ToUpper(m.confirmInput) == "CONFIRM" {
+		if strings.ToUpper(m.confirmInput.Value()) == "CONFIRM" {
 			m.currentScreen = ScreenSuccess
 			return m, nil
 		}
 
 	default:
-		// Add typed character to confirmation input
-		m.confirmInput += msg.String()
+		m.confirmInput, cmd = m.confirmInput.Update(msg)
 	}
 
-	return m, nil
+	return m, cmd
 }
 
 func (m SelectionModel) View() string {
@@ -633,31 +699,23 @@ func (m SelectionModel) renderCredentials() string {
 	b.WriteString("\n\n")
 
 	// Render each credential field
-	for i, field := range m.credentialFields {
+	for i, input := range m.credentialInputs {
 		// Format field name for display
-		displayName := strings.ReplaceAll(field, "_", " ")
-		displayName = strings.Title(displayName)
+		fieldName := getFieldNameFromPlaceholder(input.Placeholder)
+		displayName := strings.ReplaceAll(fieldName, "_", " ")
+		displayName = strings.ToUpper(displayName[:1]) + displayName[1:]
 
 		label := ui.ConfirmFieldStyle.Render(displayName + ":")
 
-		// Get current input value
-		inputValue := m.fieldInputs[field]
-
-		// Mask sensitive fields
-		if strings.Contains(field, "key") || strings.Contains(field, "secret") {
-			if len(inputValue) > 0 {
-				inputValue = strings.Repeat("*", len(inputValue))
-			}
-		}
-
-		// Highlight current field
+		// Render the textinput
+		inputView := input.View()
 		if i == m.currentField {
-			inputValue = ui.ConfirmValueStyle.Render(inputValue + "█") // Cursor
+			inputView = ui.ConfirmValueStyle.Render(inputView)
 		} else {
-			inputValue = ui.StrategyMetaStyle.Render(inputValue)
+			inputView = ui.StrategyMetaStyle.Render(inputView)
 		}
 
-		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, label+" "+inputValue))
+		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, label+" "+inputView))
 		b.WriteString("\n")
 	}
 
@@ -694,7 +752,7 @@ func (m SelectionModel) renderConfirmation() string {
 	// Selected exchange and assets
 	if m.selectedExchange != nil {
 		details = append(details, fmt.Sprintf("%s  %s",
-			ui.ConfirmFieldStyle.Render("Connectors:"),
+			ui.ConfirmFieldStyle.Render("Exchange:"),
 			ui.ConfirmValueStyle.Render(m.selectedExchange.Name),
 		))
 
@@ -745,7 +803,7 @@ func (m SelectionModel) renderConfirmation() string {
 	// Confirmation input prompt
 	b.WriteString("\n")
 	b.WriteString(ui.ConfirmFieldStyle.Render("Type 'CONFIRM' to proceed: "))
-	b.WriteString(ui.ConfirmValueStyle.Render(m.confirmInput))
+	b.WriteString(ui.ConfirmValueStyle.Render(m.confirmInput.View()))
 	b.WriteString("\n")
 
 	// Help

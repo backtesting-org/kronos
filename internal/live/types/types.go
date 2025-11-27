@@ -1,6 +1,8 @@
 package types
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 )
 
@@ -13,6 +15,8 @@ type ConfigService interface {
 }
 
 type LiveService interface {
-	RunSelectionTUI() error
-	GetStrategies() ([]Strategy, error)
+	DiscoverStrategies() ([]Strategy, error)
+	LoadConnectors() (Connectors, error)
+	ValidateCredentials(exchangeName string, credentials map[string]string) error
+	ExecuteStrategy(ctx context.Context, strategy *Strategy, exchange *ExchangeConfig) error
 }
