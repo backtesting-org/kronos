@@ -3,7 +3,7 @@
 *.dll
 *.so
 *.dylib
-./kronos
+kronos
 
 # Output directories
 bin/
