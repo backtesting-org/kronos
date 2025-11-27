@@ -7,6 +7,7 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/live"
 	"github.com/backtesting-org/kronos-cli/internal/setup"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
+	"github.com/backtesting-org/kronos-cli/internal/ui"
 	"github.com/backtesting-org/live-trading/pkg"
 	"go.uber.org/fx"
 )
@@ -20,4 +21,5 @@ var Module = fx.Options(
 	handlers.Module,
 	pkg.Module,
 	config.Module,
+	ui.Module,
 )
