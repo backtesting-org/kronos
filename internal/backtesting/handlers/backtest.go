@@ -22,22 +22,29 @@ func NewBacktestHandler(backtestService types.BacktestService, compileService sh
 }
 
 func (h *backtestHandler) Handle(cmd *cobra.Command, args []string) error {
-	interactiveMode, _ := cmd.Flags().GetBool("interactive")
+	// Check if we're in CLI mode
+	cliMode, _ := cmd.Root().PersistentFlags().GetBool("cli")
 	configPath, _ := cmd.Flags().GetString("config")
 
-	if interactiveMode || configPath == "" {
-		return h.backtestService.RunInteractive()
+	// Use CLI mode if --cli flag is set OR if --config is provided
+	if cliMode || configPath != "" {
+		if configPath == "" {
+			return fmt.Errorf("CLI mode requires --config flag\n\nUsage:\n  kronos backtest --cli --config <path>")
+		}
+
+		cfg, err := h.backtestService.LoadConfig(configPath)
+		if err != nil {
+			return err
+		}
+
+		// Pre-compile all strategies before backtesting
+		fmt.Println("🔍 Checking strategies...")
+		h.compileService.PreCompileStrategies("./strategies")
+		fmt.Println()
+
+		return h.backtestService.ExecuteBacktest(cfg)
 	}
 
-	cfg, err := h.backtestService.LoadConfig(configPath)
-	if err != nil {
-		return err
-	}
-
-	// Pre-compile all strategies before backtesting
-	fmt.Println("🔍 Checking strategies...")
-	h.compileService.PreCompileStrategies("./strategies")
-	fmt.Println()
-
-	return h.backtestService.ExecuteBacktest(cfg)
+	// Default to TUI mode (interactive)
+	return h.backtestService.RunInteractive()
 }

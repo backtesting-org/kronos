@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/backtesting-org/kronos-cli/internal/setup/scaffold"
+	"github.com/backtesting-org/kronos-cli/internal/setup/services"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -281,7 +281,7 @@ func LoadStrategies() ([]StrategyTemplate, error) {
 
 // fetchFromSDK attempts to fetch strategy metadata from SDK repository
 func fetchFromSDK() ([]StrategyTemplate, error) {
-	metadata, err := scaffold.FetchAvailableStrategies()
+	metadata, err := services.FetchAvailableStrategies()
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,7 @@ func fetchFromSDK() ([]StrategyTemplate, error) {
 	for _, m := range metadata {
 		icon := m.Icon
 		if icon == "" {
-			icon = scaffold.GetDefaultIcon(m.Type)
+			icon = services.GetDefaultIcon(m.Type)
 		}
 
 		templates = append(templates, StrategyTemplate{

@@ -35,9 +35,9 @@ func NewRootHandler(
 }
 
 func (h *rootHandler) Handle(cmd *cobra.Command, args []string) error {
-	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
+	cliMode, _ := cmd.Flags().GetBool("cli")
 
-	if nonInteractive || len(args) > 0 {
+	if cliMode || len(args) > 0 {
 		return cmd.Help()
 	}
 

@@ -39,15 +39,18 @@ Use Kronos to:
   • Analyze results
 
 Examples:
-  kronos                         Launch interactive menu
-  kronos --non-interactive       Show traditional help
-  kronos init my-project         Create a new project
-  kronos backtest                Interactive backtest
-  kronos live                    Interactive live trading`,
+  kronos                         Launch interactive TUI menu (default)
+  kronos --cli                   Show traditional CLI help
+  kronos init my-project         Create a new project (CLI mode)
+  kronos init                    Create a new project (TUI mode)
+  kronos backtest --cli --config backtest.yaml    Run backtest via CLI
+  kronos backtest                Run backtest via TUI
+  kronos live --cli --strategy arbitrage --exchange binance    Run live via CLI
+  kronos live                    Run live via TUI`,
 		RunE: rootHandler.Handle,
 	}
 
-	rootCmd.PersistentFlags().Bool("non-interactive", false, "Disable interactive mode")
+	rootCmd.PersistentFlags().Bool("cli", false, "Use CLI mode instead of interactive TUI")
 
 	// Init command
 	initCmd := &cobra.Command{
@@ -71,8 +74,7 @@ Examples:
 		Short: "Run backtests",
 		RunE:  backtestHandler.Handle,
 	}
-	backtestCmd.Flags().String("config", "", "Path to backtest config file")
-	backtestCmd.Flags().Bool("interactive", false, "Run in interactive mode")
+	backtestCmd.Flags().String("config", "", "Path to backtest config file (for CLI mode)")
 
 	// Analyze command
 	analyzeCmd := &cobra.Command{

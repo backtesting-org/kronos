@@ -1,4 +1,4 @@
-package scaffold
+package services
 
 import (
 	"fmt"

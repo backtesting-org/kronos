@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 
+	"github.com/backtesting-org/kronos-cli/internal/config"
 	"github.com/backtesting-org/kronos-cli/internal/live/types"
 	"github.com/spf13/viper"
 )
@@ -12,9 +13,9 @@ type configService struct {
 	configPath string
 }
 
-func NewConfigService(configPath string) types.ConfigService {
+func NewConfigService() types.ConfigService {
 	return &configService{
-		configPath: configPath,
+		configPath: config.KronosConfigurationPath,
 	}
 }
 

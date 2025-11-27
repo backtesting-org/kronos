@@ -1,6 +1,7 @@
 package live
 
 import (
+	"github.com/backtesting-org/kronos-cli/internal/live/handlers"
 	"github.com/backtesting-org/kronos-cli/internal/live/handlers/cli"
 	"github.com/backtesting-org/kronos-cli/internal/live/handlers/interactive"
 	"github.com/backtesting-org/kronos-cli/internal/live/services"
@@ -13,7 +14,10 @@ var Module = fx.Module("live",
 	fx.Provide(services.NewLiveService),
 	fx.Provide(services.NewConfigService),
 
-	// Handlers
-	fx.Provide(cli.NewLiveHandler),
+	// Sub-handlers (CLI and TUI)
+	fx.Provide(cli.NewCLILiveHandler),
 	fx.Provide(interactive.NewTUIHandler),
+
+	// Unified handler that routes between CLI and TUI
+	fx.Provide(handlers.NewLiveHandler),
 )
