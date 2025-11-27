@@ -1,47 +1,36 @@
 package shared
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/live/types"
+	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 )
 
 type StrategyDiscovery interface {
-	DiscoverStrategies() ([]types.Strategy, error)
+	DiscoverStrategies() ([]strategy.Strategy, error)
 }
 
 type strategyDiscovery struct {
-	compileSvc CompileService
-	logger     logging.ApplicationLogger
+	strategyConfig strategy.StrategyConfig
+	logger         logging.ApplicationLogger
 }
 
 func NewStrategyDiscovery(
-	compileSvc CompileService,
+	strategyConfig strategy.StrategyConfig,
 	logger logging.ApplicationLogger,
 ) StrategyDiscovery {
 	return &strategyDiscovery{
-		compileSvc: compileSvc,
-		logger:     logger,
+		strategyConfig: strategyConfig,
+		logger:         logger,
 	}
 }
 
-// DiscoverStrategies finds and compiles strategies, returns them with compilation status
-func (s *strategyDiscovery) DiscoverStrategies() ([]types.Strategy, error) {
-	// Pre-compile all strategies
-	s.logger.Info("Discovering strategies")
-	compileErrors := s.compileSvc.PreCompileStrategies("./strategies")
+// DiscoverStrategies finds and compiles strategies
+func (s *strategyDiscovery) DiscoverStrategies() ([]strategy.Strategy, error) {
+	strategies, err := s.strategyConfig.FindStrategies()
 
-	// Discover strategies
-	strategies, err := types.DiscoverStrategies()
 	if err != nil {
-		return []types.Strategy{}, nil // Return empty list, not error
-	}
-
-	// Apply compilation errors to strategies
-	for i := range strategies {
-		if compErr, hasError := compileErrors[strategies[i].Name]; hasError {
-			strategies[i].Status = types.StatusError
-			strategies[i].Error = compErr.Error()
-		}
+		s.logger.Error("Failed to discover strategies", "error", err)
+		return nil, err
 	}
 
 	return strategies, nil

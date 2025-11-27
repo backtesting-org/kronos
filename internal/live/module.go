@@ -12,7 +12,6 @@ import (
 var Module = fx.Module("live",
 	// Services
 	fx.Provide(services.NewLiveService),
-	fx.Provide(services.NewConfigService),
 
 	// Sub-handlers (CLI and TUI)
 	fx.Provide(cli.NewCLILiveHandler),

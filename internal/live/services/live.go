@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/backtesting-org/kronos-cli/internal/config/settings"
+	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/live/types"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
@@ -11,40 +13,38 @@ import (
 
 // liveService orchestrates live trading by coordinating other services
 type liveService struct {
+	kronos   settings.Settings
 	compile  shared.CompileService
 	discover shared.StrategyDiscovery
-	config   types.ConfigService
 	logger   logging.ApplicationLogger
 }
 
 func NewLiveService(
+	kronos settings.Settings,
 	compileSvc shared.CompileService,
-	configSvc types.ConfigService,
 	discovery shared.StrategyDiscovery,
 	logger logging.ApplicationLogger,
 ) types.LiveService {
 	return &liveService{
+		kronos:   kronos,
 		compile:  compileSvc,
 		discover: discovery,
-		config:   configSvc,
 		logger:   logger,
 	}
 }
 
-// DiscoverStrategies finds and compiles all available strategies
-func (s *liveService) DiscoverStrategies() ([]types.Strategy, error) {
-	s.logger.Info("Discovering strategies...")
-	return s.discover.DiscoverStrategies()
+func (s *liveService) FindStrategies() ([]strategy.Strategy, error) {
+	strategies, err := s.discover.DiscoverStrategies()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return strategies, nil
 }
 
-// LoadConnectors loads exchange configurations from kronos.yml
-func (s *liveService) LoadConnectors() (types.Connectors, error) {
-	s.logger.Info("Loading exchange configuration...")
-	connectors, err := s.config.LoadExchangeCredentials()
-	if err != nil {
-		return types.Connectors{}, err
-	}
-	return connectors, nil
+func (s *liveService) FindConnectors() []settings.Connector {
+	return s.kronos.Connectors
 }
 
 // ValidateCredentials validates exchange credentials
@@ -54,7 +54,7 @@ func (s *liveService) ValidateCredentials(exchangeName string, credentials map[s
 }
 
 // ExecuteStrategy runs the selected strategy with the selected exchange
-func (s *liveService) ExecuteStrategy(ctx context.Context, strategy *types.Strategy, exchange *types.ExchangeConfig) error {
+func (s *liveService) ExecuteStrategy(ctx context.Context, strategy *strategy.Strategy, exchange *settings.Connector) error {
 	s.logger.Info("Preparing to execute strategy",
 		"strategy", strategy.Name,
 		"exchange", exchange.Name,

@@ -3,6 +3,8 @@ package types
 import (
 	"context"
 
+	"github.com/backtesting-org/kronos-cli/internal/config/settings"
+	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/spf13/cobra"
 )
 
@@ -10,13 +12,9 @@ type LiveHandler interface {
 	Handle(cmd *cobra.Command, args []string) error
 }
 
-type ConfigService interface {
-	LoadExchangeCredentials() (Connectors, error)
-}
-
 type LiveService interface {
-	DiscoverStrategies() ([]Strategy, error)
-	LoadConnectors() (Connectors, error)
+	FindStrategies() ([]strategy.Strategy, error)
+	FindConnectors() []settings.Connector
 	ValidateCredentials(exchangeName string, credentials map[string]string) error
-	ExecuteStrategy(ctx context.Context, strategy *Strategy, exchange *ExchangeConfig) error
+	ExecuteStrategy(ctx context.Context, strategy *strategy.Strategy, exchange *settings.Connector) error
 }

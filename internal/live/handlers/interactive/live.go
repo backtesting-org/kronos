@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 
+	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/live/types"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -33,17 +32,12 @@ func NewTUIHandler(service types.LiveService) LiveInteractive {
 // Run executes the TUI flow - this is where Tea orchestration lives
 func (l *live) Run() error {
 	// 1. Load data from service
-	connectors, err := l.service.LoadConnectors()
+	strategies, err := l.service.FindStrategies()
 	if err != nil {
 		return err
 	}
 
-	strategies, err := l.service.DiscoverStrategies()
-	if err != nil {
-		return err
-	}
-
-	model := NewSelectionModel(strategies, connectors)
+	model := NewSelectionModel(strategies)
 	program := tea.NewProgram(model, tea.WithAltScreen())
 
 	finalModel, err := program.Run()
@@ -62,7 +56,7 @@ func (l *live) Run() error {
 	}
 
 	// 4. Execute if user selected something
-	if result.Selected() != nil && result.SelectedExchange() != nil {
+	if result.Selected() != nil {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -76,38 +70,15 @@ func (l *live) Run() error {
 			cancel()
 		}()
 
-		return l.service.ExecuteStrategy(ctx, result.Selected(), result.SelectedExchange())
+		// Service handles all exchange/connector logic
+		return l.service.ExecuteStrategy(ctx, result.Selected(), nil)
 	}
 
 	return nil
 }
 
-// SelectionModel is the Bubble Tea model for strategy selection (pure view layer)
-type SelectionModel struct {
-	strategies       []types.Strategy
-	cursor           int
-	scrollOffset     int
-	selected         *types.Strategy
-	selectedExchange *types.ExchangeConfig
-	connectors       types.Connectors
-	currentScreen    Screen
-	width            int
-	height           int
-	err              error
-
-	// Exchange selection
-	exchangeCursor int
-
-	// Credential input fields
-	credentialInputs []textinput.Model
-	currentField     int
-
-	// Confirmation input
-	confirmInput textinput.Model
-}
-
 // NewSelectionModel creates a new strategy selection model (view only)
-func NewSelectionModel(strategies []types.Strategy, connectors types.Connectors) SelectionModel {
+func NewSelectionModel(strategies []strategy.Strategy) SelectionModel {
 	// If no strategies, start with empty state screen
 	initialScreen := ScreenSelection
 	if len(strategies) == 0 {
@@ -116,7 +87,6 @@ func NewSelectionModel(strategies []types.Strategy, connectors types.Connectors)
 
 	return SelectionModel{
 		strategies:    strategies,
-		connectors:    connectors,
 		cursor:        0,
 		currentScreen: initialScreen,
 		width:         80,
@@ -130,13 +100,8 @@ func (m SelectionModel) Err() error {
 }
 
 // Selected returns the selected strategy
-func (m SelectionModel) Selected() *types.Strategy {
+func (m SelectionModel) Selected() *strategy.Strategy {
 	return m.selected
-}
-
-// SelectedExchange returns the selected exchange
-func (m SelectionModel) SelectedExchange() *types.ExchangeConfig {
-	return m.selectedExchange
 }
 
 // CurrentScreen returns the current screen
@@ -161,16 +126,6 @@ func (m SelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateEmptyState(msg)
 		case ScreenSelection:
 			return m.updateSelection(msg)
-		case ScreenExchangeSelection:
-			return m.updateExchangeSelection(msg)
-		case ScreenCredentials:
-			return m.updateCredentials(msg)
-		case ScreenConfirmation:
-			return m.updateConfirmation(msg)
-		case ScreenSuccess:
-			if msg.String() == "q" || msg.String() == "enter" {
-				return m, tea.Quit
-			}
 		}
 	}
 
@@ -217,226 +172,17 @@ func (m SelectionModel) updateSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter", " ":
 		// Check if the selected strategy has an error
-		if m.strategies[m.cursor].Status == types.StatusError {
+		if m.strategies[m.cursor].Status == strategy.StatusError {
 			// Don't allow selection of strategies with errors
 			return m, nil
 		}
 
-		// Select the current strategy
+		// Select the current strategy and quit - service will handle execution
 		m.selected = &m.strategies[m.cursor]
-
-		// Get available exchanges for this strategy from global config
-		availableExchanges := m.getAvailableExchangesForStrategy()
-
-		if len(availableExchanges) == 1 {
-			// Only one exchange, auto-select it and move to credentials
-			m.selectedExchange = availableExchanges[0]
-			m.setupCredentialFields()
-			m.currentScreen = ScreenCredentials
-		} else if len(availableExchanges) > 1 {
-			// Multiple exchanges, let user choose
-			m.currentScreen = ScreenExchangeSelection
-			m.exchangeCursor = 0
-		} else {
-			// No exchanges configured
-			m.err = fmt.Errorf("no exchanges configured for this strategy")
-		}
+		return m, tea.Quit
 	}
 
 	return m, nil
-}
-
-func (m SelectionModel) updateExchangeSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	availableExchanges := m.getAvailableExchangesForStrategy()
-
-	switch msg.String() {
-	case "esc":
-		m.currentScreen = ScreenSelection
-		m.selected = nil
-
-	case "ctrl+c":
-		return m, tea.Quit
-
-	case "up", "k":
-		if m.exchangeCursor > 0 {
-			m.exchangeCursor--
-		}
-
-	case "down", "j":
-		if m.exchangeCursor < len(availableExchanges)-1 {
-			m.exchangeCursor++
-		}
-
-	case "enter", " ":
-		// Select the current exchange
-		if m.exchangeCursor < len(availableExchanges) {
-			m.selectedExchange = availableExchanges[m.exchangeCursor]
-			m.setupCredentialFields()
-			m.currentScreen = ScreenCredentials
-		}
-	}
-
-	return m, nil
-}
-
-func (m SelectionModel) updateCredentials(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch msg.String() {
-	case "esc":
-		if len(m.selected.Config.Exchanges) > 1 {
-			m.currentScreen = ScreenExchangeSelection
-		} else {
-			m.currentScreen = ScreenSelection
-		}
-		m.selectedExchange = nil
-		m.credentialInputs = nil
-
-	case "ctrl+c":
-		return m, tea.Quit
-
-	case "tab", "down":
-		if m.currentField < len(m.credentialInputs)-1 {
-			m.currentField++
-			m.credentialInputs[m.currentField].Focus()
-		}
-
-	case "shift+tab", "up":
-		if m.currentField > 0 {
-			m.currentField--
-			m.credentialInputs[m.currentField].Focus()
-		}
-
-	case "enter":
-		if m.currentField < len(m.credentialInputs)-1 {
-			m.currentField++
-			m.credentialInputs[m.currentField].Focus()
-		} else {
-			// Save credentials and proceed
-			for _, input := range m.credentialInputs {
-				fieldName := getFieldNameFromPlaceholder(input.Placeholder)
-				if m.selectedExchange.Credentials == nil {
-					m.selectedExchange.Credentials = make(map[string]string)
-				}
-				m.selectedExchange.Credentials[fieldName] = input.Value()
-			}
-
-			// Initialize confirm input
-			m.confirmInput = textinput.New()
-			m.confirmInput.Placeholder = "Type CONFIRM"
-			m.confirmInput.Focus()
-			m.currentScreen = ScreenConfirmation
-		}
-
-	default:
-		// Update the current text input
-		m.credentialInputs[m.currentField], cmd = m.credentialInputs[m.currentField].Update(msg)
-	}
-
-	return m, cmd
-}
-
-// getAvailableExchangesForStrategy returns the list of exchange configs available for the selected strategy
-// Pure view logic - just filters based on what's already loaded
-func (m *SelectionModel) getAvailableExchangesForStrategy() []*types.ExchangeConfig {
-	if m.selected == nil {
-		return []*types.ExchangeConfig{}
-	}
-
-	var available []*types.ExchangeConfig
-	for _, exchangeName := range m.selected.Config.Exchanges {
-		// Find this exchange in connectors
-		for i := range m.connectors.Exchanges {
-			if m.connectors.Exchanges[i].Name == exchangeName && m.connectors.Exchanges[i].Enabled {
-				available = append(available, &m.connectors.Exchanges[i])
-				break
-			}
-		}
-	}
-
-	return available
-}
-
-// getFieldNameFromPlaceholder extracts the field name from the placeholder text
-func getFieldNameFromPlaceholder(placeholder string) string {
-	// Placeholder format: "Enter your api_key"
-	parts := strings.Fields(placeholder)
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
-	}
-	return ""
-}
-
-// setupCredentialFields creates textinput models for credential entry
-func (m *SelectionModel) setupCredentialFields() {
-	if m.selectedExchange == nil {
-		return
-	}
-
-	m.currentField = 0
-	m.credentialInputs = []textinput.Model{}
-
-	// Map exchange type to credential field names
-	var fields []string
-	switch m.selectedExchange.Name {
-	case "paradex":
-		fields = []string{"account_address", "eth_private_key", "l2_private_key"}
-	case "bybit", "binance", "kraken":
-		fields = []string{"api_key", "api_secret"}
-	default:
-		fields = []string{"api_key", "api_secret"}
-	}
-
-	// Create textinput for each field
-	for i, field := range fields {
-		ti := textinput.New()
-		ti.Placeholder = fmt.Sprintf("Enter your %s", field)
-		ti.CharLimit = 256
-
-		// Mask sensitive fields
-		if strings.Contains(field, "key") || strings.Contains(field, "secret") {
-			ti.EchoMode = textinput.EchoPassword
-			ti.EchoCharacter = '•'
-		}
-
-		// Pre-fill with existing value if available
-		if m.selectedExchange.Credentials != nil {
-			if val, ok := m.selectedExchange.Credentials[field]; ok {
-				ti.SetValue(val)
-			}
-		}
-
-		// Focus first field
-		if i == 0 {
-			ti.Focus()
-		}
-
-		m.credentialInputs = append(m.credentialInputs, ti)
-	}
-}
-
-func (m SelectionModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch msg.String() {
-	case "esc":
-		m.currentScreen = ScreenCredentials
-		return m, nil
-
-	case "ctrl+c":
-		return m, tea.Quit
-
-	case "enter":
-		if strings.ToUpper(m.confirmInput.Value()) == "CONFIRM" {
-			m.currentScreen = ScreenSuccess
-			return m, nil
-		}
-
-	default:
-		m.confirmInput, cmd = m.confirmInput.Update(msg)
-	}
-
-	return m, cmd
 }
 
 func (m SelectionModel) View() string {
@@ -445,14 +191,6 @@ func (m SelectionModel) View() string {
 		return m.renderEmptyState()
 	case ScreenSelection:
 		return m.renderSelection()
-	case ScreenExchangeSelection:
-		return m.renderExchangeSelection()
-	case ScreenCredentials:
-		return m.renderCredentials()
-	case ScreenConfirmation:
-		return m.renderConfirmation()
-	case ScreenSuccess:
-		return m.renderSuccess()
 	default:
 		return "Unknown screen"
 	}
@@ -535,50 +273,34 @@ func (m SelectionModel) renderSelection() string {
 	}
 
 	for i := visibleStart; i < visibleEnd; i++ {
-		strategy := m.strategies[i]
+		strat := m.strategies[i]
 		cursor := "  "
 		if m.cursor == i {
 			cursor = "▶ "
 		}
 
 		// Build strategy item
-		statusIndicator := ui.GetStatusIndicator(strategy.Status)
+		statusIndicator := ui.GetStatusIndicator(strat.Status)
 
-		name := strategy.Name
+		name := strat.Name
 		if m.cursor == i {
 			name = ui.StrategyNameSelectedStyle.Render(name)
 		} else {
 			name = ui.StrategyNameStyle.Render(name)
 		}
 
-		description := ui.StrategyDescStyle.Render(strategy.Description)
-
-		// Connectors and asset info
-		exchangeNames := []string{}
-		assetCount := 0
-		for _, ex := range strategy.Exchanges {
-			if ex.Enabled {
-				exchangeNames = append(exchangeNames, ex.Name)
-				assetCount += len(ex.Assets)
-			}
-		}
-		meta := ui.StrategyMetaStyle.Render(fmt.Sprintf(
-			"Connectors: %s | Assets: %d",
-			strings.Join(exchangeNames, ", "),
-			assetCount,
-		))
+		description := ui.StrategyDescStyle.Render(strat.Description)
 
 		itemContent := fmt.Sprintf(
-			"%s  %s\n%s\n%s",
+			"%s  %s\n%s",
 			statusIndicator,
 			name,
 			description,
-			meta,
 		)
 
 		// Add error message if strategy has an error and is selected
-		if strategy.Status == types.StatusError && strategy.Error != "" && m.cursor == i {
-			errorMsg := ui.StatusErrorStyle.Render(fmt.Sprintf("⚠ Error: %s", strategy.Error))
+		if strat.Status == strategy.StatusError && strat.Error != "" && m.cursor == i {
+			errorMsg := ui.StatusErrorStyle.Render(fmt.Sprintf("⚠ Error: %s", strat.Error))
 			itemContent += "\n" + errorMsg
 		}
 
@@ -604,7 +326,7 @@ func (m SelectionModel) renderSelection() string {
 	help := ui.HelpStyle.Render("↑↓/jk Navigate  ↵ Select  q Quit")
 
 	// Check if current strategy has error to show additional help
-	if m.cursor < len(m.strategies) && m.strategies[m.cursor].Status == types.StatusError {
+	if m.cursor < len(m.strategies) && m.strategies[m.cursor].Status == strategy.StatusError {
 		help += "\n" + ui.StatusErrorStyle.Render("  ⚠ Cannot select strategy with errors")
 	}
 
@@ -612,290 +334,4 @@ func (m SelectionModel) renderSelection() string {
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
 
 	return b.String()
-}
-
-func (m SelectionModel) renderExchangeSelection() string {
-	if m.selected == nil {
-		return "No strategy selected"
-	}
-
-	availableExchanges := m.getAvailableExchangesForStrategy()
-
-	var b strings.Builder
-
-	// Title
-	title := ui.TitleStyle.Render("SELECT EXCHANGE")
-	subtitle := ui.SubtitleStyle.Render(fmt.Sprintf("Choose exchange for %s strategy", m.selected.Name))
-
-	b.WriteString("\n")
-	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, title))
-	b.WriteString("\n")
-	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, subtitle))
-	b.WriteString("\n\n")
-
-	// Connectors list
-	for i, exConfig := range availableExchanges {
-		cursor := "  "
-		if m.exchangeCursor == i {
-			cursor = "▶ "
-		}
-
-		// Build exchange item
-		name := exConfig.Name
-		if m.exchangeCursor == i {
-			name = ui.StrategyNameSelectedStyle.Render(name)
-		} else {
-			name = ui.StrategyNameStyle.Render(name)
-		}
-
-		// Get assets for this exchange from strategy config
-		assets := m.selected.Config.Assets[exConfig.Name]
-		assetInfo := ui.StrategyMetaStyle.Render(fmt.Sprintf("Assets: %s", strings.Join(assets, ", ")))
-
-		networkInfo := ""
-		if exConfig.Network != "" {
-			networkInfo = ui.StrategyMetaStyle.Render(fmt.Sprintf("Network: %s", exConfig.Network))
-		}
-
-		itemContent := fmt.Sprintf("%s\n%s", name, assetInfo)
-		if networkInfo != "" {
-			itemContent += "\n" + networkInfo
-		}
-
-		var item string
-		if m.exchangeCursor == i {
-			item = ui.StrategyItemSelectedStyle.Render(cursor + itemContent)
-		} else {
-			item = ui.StrategyItemStyle.Render(cursor + itemContent)
-		}
-
-		b.WriteString(lipgloss.Place(m.width, lipgloss.Height(item), lipgloss.Center, lipgloss.Top, item))
-		b.WriteString("\n")
-	}
-
-	// Help text
-	help := ui.HelpStyle.Render("↑↓/jk Navigate  ↵ Select  esc Back  ctrl+c Quit")
-	b.WriteString("\n")
-	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
-
-	return b.String()
-}
-
-func (m SelectionModel) renderCredentials() string {
-	if m.selected == nil || m.selectedExchange == nil {
-		return "No exchange selected"
-	}
-
-	var b strings.Builder
-
-	// Title
-	title := ui.TitleStyle.Render(fmt.Sprintf("🔐 %s CREDENTIALS", strings.ToUpper(m.selectedExchange.Name)))
-	subtitle := ui.SubtitleStyle.Render("Enter your API credentials")
-
-	b.WriteString("\n\n")
-	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, title))
-	b.WriteString("\n")
-	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, subtitle))
-	b.WriteString("\n\n")
-
-	// Render each credential field
-	for i, input := range m.credentialInputs {
-		// Format field name for display
-		fieldName := getFieldNameFromPlaceholder(input.Placeholder)
-		displayName := strings.ReplaceAll(fieldName, "_", " ")
-		displayName = strings.ToUpper(displayName[:1]) + displayName[1:]
-
-		label := ui.ConfirmFieldStyle.Render(displayName + ":")
-
-		// Render the textinput
-		inputView := input.View()
-		if i == m.currentField {
-			inputView = ui.ConfirmValueStyle.Render(inputView)
-		} else {
-			inputView = ui.StrategyMetaStyle.Render(inputView)
-		}
-
-		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, label+" "+inputView))
-		b.WriteString("\n")
-	}
-
-	// Help text
-	b.WriteString("\n")
-	help := ui.HelpStyle.Render("↑↓/tab Navigate  ↵ Next/Continue  esc Back  ctrl+c Quit")
-	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
-
-	return b.String()
-}
-
-func (m SelectionModel) renderConfirmation() string {
-	if m.selected == nil {
-		return "No strategy selected"
-	}
-
-	var b strings.Builder
-
-	// Title
-	title := ui.ConfirmTitleStyle.Render("⚠️  CONFIRM DEPLOYMENT")
-	b.WriteString("\n\n")
-	b.WriteString(title)
-	b.WriteString("\n\n")
-
-	// Strategy details
-	details := []string{}
-
-	// Strategy name
-	details = append(details, fmt.Sprintf("%s  %s",
-		ui.ConfirmFieldStyle.Render("Strategy:"),
-		ui.ConfirmValueStyle.Render(m.selected.Name),
-	))
-
-	// Selected exchange and assets
-	if m.selectedExchange != nil {
-		details = append(details, fmt.Sprintf("%s  %s",
-			ui.ConfirmFieldStyle.Render("Exchange:"),
-			ui.ConfirmValueStyle.Render(m.selectedExchange.Name),
-		))
-
-		if m.selectedExchange.Network != "" {
-			details = append(details, fmt.Sprintf("%s  %s",
-				ui.ConfirmFieldStyle.Render("Network:"),
-				ui.ConfirmValueStyle.Render(m.selectedExchange.Network),
-			))
-		}
-
-		// Get assets from strategy config
-		assets := m.selected.Config.Assets[m.selectedExchange.Name]
-		details = append(details, fmt.Sprintf("%s  %s",
-			ui.ConfirmFieldStyle.Render("Assets:"),
-			ui.ConfirmValueStyle.Render(strings.Join(assets, ", ")),
-		))
-	}
-
-	// Mode
-	modeIndicator := ui.GetModeIndicator(m.selected.Config.Execution.DryRun)
-	details = append(details, fmt.Sprintf("%s  %s",
-		ui.ConfirmFieldStyle.Render("Mode:"),
-		modeIndicator,
-	))
-
-	// Risk limits
-	details = append(details, "")
-	details = append(details, ui.ConfirmFieldStyle.Render("Risk Limits:"))
-	details = append(details, fmt.Sprintf("  Max Position: %s",
-		ui.ConfirmValueStyle.Render(fmt.Sprintf("$%.0f", m.selected.Config.Risk.MaxPositionSize)),
-	))
-	details = append(details, fmt.Sprintf("  Max Daily Loss: %s",
-		ui.ConfirmValueStyle.Render(fmt.Sprintf("$%.0f", m.selected.Config.Risk.MaxDailyLoss)),
-	))
-
-	detailsText := strings.Join(details, "\n")
-	b.WriteString(detailsText)
-	b.WriteString("\n")
-
-	// Warning if live trading
-	if !m.selected.Config.Execution.DryRun {
-		warning := ui.ConfirmWarningStyle.Render("🔴 This will execute real trades with real money!")
-		b.WriteString("\n")
-		b.WriteString(warning)
-		b.WriteString("\n")
-	}
-
-	// Confirmation input prompt
-	b.WriteString("\n")
-	b.WriteString(ui.ConfirmFieldStyle.Render("Type 'CONFIRM' to proceed: "))
-	b.WriteString(ui.ConfirmValueStyle.Render(m.confirmInput.View()))
-	b.WriteString("\n")
-
-	// Help
-	b.WriteString("\n")
-	help := ui.HelpStyle.Render("↵ Proceed  esc Cancel  ctrl+c Quit")
-	b.WriteString(help)
-
-	// Wrap in box
-	boxed := ui.ConfirmBoxStyle.Render(b.String())
-
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
-}
-
-func (m SelectionModel) renderSuccess() string {
-	if m.selected == nil {
-		return "No strategy selected"
-	}
-
-	var b strings.Builder
-
-	// Success message
-	successIcon := ui.StatusReadyStyle.Render("✓")
-	title := ui.StrategyNameSelectedStyle.Render(fmt.Sprintf("Strategy '%s' deployed successfully!", m.selected.Name))
-
-	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("%s  %s", successIcon, title))
-	b.WriteString("\n\n")
-
-	// Build the actual command that will be executed
-	nextSteps := []string{
-		"",
-		"Command to be executed:",
-		"",
-	}
-
-	if m.selectedExchange != nil {
-		// Get the .so file path
-		strategyName := filepath.Base(m.selected.Path)
-		soPath := filepath.Join(m.selected.Path, strategyName+".so")
-
-		// Build command based on exchange type
-		if m.selectedExchange.Name == "paradex" {
-			nextSteps = append(nextSteps,
-				ui.SubtitleStyle.Render("  kronos-live run \\"),
-				ui.SubtitleStyle.Render(fmt.Sprintf("    --exchange %s \\", m.selectedExchange.Name)),
-				ui.SubtitleStyle.Render(fmt.Sprintf("    --strategy %s \\", soPath)),
-			)
-
-			// Add Paradex-specific flags
-			if accountAddr, ok := m.selectedExchange.Credentials["account_address"]; ok && accountAddr != "" {
-				nextSteps = append(nextSteps, ui.SubtitleStyle.Render(fmt.Sprintf("    --paradex-account-address %s \\", accountAddr)))
-			}
-			if ethKey, ok := m.selectedExchange.Credentials["eth_private_key"]; ok && ethKey != "" {
-				masked := ethKey
-				if len(masked) > 10 {
-					masked = masked[:6] + "..." + masked[len(masked)-4:]
-				}
-				nextSteps = append(nextSteps, ui.SubtitleStyle.Render(fmt.Sprintf("    --paradex-eth-private-key %s \\", masked)))
-			}
-			if l2Key, ok := m.selectedExchange.Credentials["l2_private_key"]; ok && l2Key != "" {
-				masked := l2Key
-				if len(masked) > 10 {
-					masked = masked[:6] + "..." + masked[len(masked)-4:]
-				}
-				nextSteps = append(nextSteps, ui.SubtitleStyle.Render(fmt.Sprintf("    --paradex-l2-private-key %s \\", masked)))
-			}
-			if m.selectedExchange.Network != "" {
-				nextSteps = append(nextSteps, ui.SubtitleStyle.Render(fmt.Sprintf("    --paradex-network %s", m.selectedExchange.Network)))
-			}
-		} else {
-			// Generic exchange command
-			nextSteps = append(nextSteps,
-				ui.SubtitleStyle.Render("  kronos-live run \\"),
-				ui.SubtitleStyle.Render(fmt.Sprintf("    --exchange %s \\", m.selectedExchange.Name)),
-				ui.SubtitleStyle.Render(fmt.Sprintf("    --strategy %s", soPath)),
-			)
-		}
-	}
-
-	nextSteps = append(nextSteps,
-		"",
-		"",
-		ui.StrategyMetaStyle.Render("Press Enter to start live trading, or Q to quit"),
-		"",
-	)
-
-	b.WriteString(strings.Join(nextSteps, "\n"))
-
-	help := ui.HelpStyle.Render("↵ Start Live Trading  q Quit")
-	b.WriteString("\n")
-	b.WriteString(help)
-
-	boxed := ui.BoxStyle.Render(b.String())
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
 }
