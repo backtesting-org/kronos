@@ -1,6 +1,9 @@
-package live
+package ui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/backtesting-org/kronos-cli/internal/live/types"
+	"github.com/charmbracelet/lipgloss"
+)
 
 // Color palette
 var (
@@ -131,15 +134,15 @@ var (
 )
 
 // GetStatusIndicator returns a styled status indicator
-func GetStatusIndicator(status StrategyStatus) string {
+func GetStatusIndicator(status types.StrategyStatus) string {
 	switch status {
-	case StatusReady:
+	case types.StatusReady:
 		return StatusReadyStyle.Render("● READY")
-	case StatusRunning:
+	case types.StatusRunning:
 		return StatusRunningStyle.Render("● RUNNING")
-	case StatusStopped:
+	case types.StatusStopped:
 		return StatusDangerStyle.Render("● STOPPED")
-	case StatusError:
+	case types.StatusError:
 		return StatusDangerStyle.Render("● ERROR")
 	default:
 		return StatusReadyStyle.Render("● READY")

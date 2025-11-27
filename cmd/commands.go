@@ -1,7 +1,10 @@
 package cmd
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/handlers"
+	backtesting "github.com/backtesting-org/kronos-cli/internal/backtesting/types"
+	core "github.com/backtesting-org/kronos-cli/internal/handlers"
+	live "github.com/backtesting-org/kronos-cli/internal/live/types"
+	setup "github.com/backtesting-org/kronos-cli/internal/setup/types"
 	"github.com/spf13/cobra"
 )
 
@@ -17,17 +20,17 @@ type Commands struct {
 
 // NewCommands creates all cobra commands and wires them to handlers
 func NewCommands(
-	rootHandler *handlers.RootHandler,
-	initHandler *handlers.InitHandler,
-	liveHandler *handlers.LiveHandler,
-	backtestHandler *handlers.BacktestHandler,
-	analyzeHandler *handlers.AnalyzeHandler,
+	rootHandler core.RootHandler,
+	initHandler setup.InitHandler,
+	liveHandler live.LiveHandler,
+	backtestHandler backtesting.BacktestHandler,
+	analyzeHandler backtesting.AnalyzeHandler,
 ) *Commands {
 	// Root command
 	rootCmd := &cobra.Command{
 		Use:   "kronos",
 		Short: "Kronos - Trading infrastructure platform",
-		Long: `Kronos CLI - Beautiful backtesting and live trading infrastructure
+		Long: `Kronos CLI - Backtesting and live trading infrastructure
 
 Use Kronos to:
   • Configure backtests via YAML
@@ -60,7 +63,7 @@ Examples:
 		RunE:  liveHandler.Handle,
 	}
 	liveCmd.Flags().String("strategy", "", "Strategy name for non-interactive mode")
-	liveCmd.Flags().String("exchange", "", "Exchange for non-interactive mode")
+	liveCmd.Flags().String("exchange", "", "Connectors for non-interactive mode")
 
 	// Backtest command
 	backtestCmd := &cobra.Command{

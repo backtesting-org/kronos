@@ -1,9 +1,8 @@
-package live
+package types
 
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
@@ -30,7 +29,7 @@ const (
 	StatusError   StrategyStatus = "error"
 )
 
-// Exchange represents an exchange configuration
+// Connectors represents an exchange configuration
 type Exchange struct {
 	Name    string
 	Enabled bool
@@ -39,33 +38,26 @@ type Exchange struct {
 
 // StrategyConfig represents the parsed config.yml for a strategy
 type StrategyConfig struct {
-	Name        string                  `yaml:"name"`
-	Description string                  `yaml:"description"`
-	Status      StrategyStatus          `yaml:"status"`
-	Exchanges   []string                `yaml:"exchanges"`        // Exchange names (references exchanges.yml)
-	Assets      map[string][]string     `yaml:"assets"`           // Assets per exchange
-	Parameters  map[string]interface{}  `yaml:"parameters"`       // Strategy-specific parameters
-	Risk        RiskConfig              `yaml:"risk"`
-	Execution   ExecutionConfig         `yaml:"execution"`
+	Name        string                 `yaml:"name"`
+	Description string                 `yaml:"description"`
+	Status      StrategyStatus         `yaml:"status"`
+	Exchanges   []string               `yaml:"exchanges"`  // Exchanges names (references exchanges.yml)
+	Assets      map[string][]string    `yaml:"assets"`     // Assets per exchange
+	Parameters  map[string]interface{} `yaml:"parameters"` // Strategy-specific parameters
+	Risk        RiskConfig             `yaml:"risk"`
+	Execution   ExecutionConfig        `yaml:"execution"`
 }
 
-// GlobalExchangesConfig represents the exchanges.yml file at project root
-type GlobalExchangesConfig struct {
+// Connectors represents the exchanges.yml file at project root
+type Connectors struct {
 	Exchanges []ExchangeConfig `yaml:"exchanges"`
-}
-
-// ParadexCredentials represents Paradex-specific credentials
-type ParadexCredentials struct {
-	AccountAddress string `yaml:"account_address"`
-	EthPrivateKey  string `yaml:"eth_private_key"`
-	L2PrivateKey   string `yaml:"l2_private_key,omitempty"`
 }
 
 // ExchangeConfig represents exchange configuration in YAML
 type ExchangeConfig struct {
 	Name        string            `yaml:"name"`
 	Enabled     bool              `yaml:"enabled"`
-	Network     string            `yaml:"network,omitempty"`      // For Paradex: mainnet/testnet
+	Network     string            `yaml:"network,omitempty"` // For Paradex: mainnet/testnet
 	Assets      []string          `yaml:"assets"`
 	Credentials map[string]string `yaml:"credentials,omitempty"`
 }
@@ -247,17 +239,17 @@ func SaveStrategyConfig(path string, config *StrategyConfig) error {
 }
 
 // LoadGlobalExchangesConfig loads the global exchanges.yml from project root
-func LoadGlobalExchangesConfig(path string) (*GlobalExchangesConfig, error) {
+func LoadGlobalExchangesConfig(path string) (*Connectors, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Return empty config if file doesn't exist
-			return &GlobalExchangesConfig{Exchanges: []ExchangeConfig{}}, nil
+			return &Connectors{Exchanges: []ExchangeConfig{}}, nil
 		}
 		return nil, fmt.Errorf("failed to read exchanges config: %w", err)
 	}
 
-	var config GlobalExchangesConfig
+	var config Connectors
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse exchanges config: %w", err)
 	}
@@ -273,7 +265,7 @@ func LoadGlobalExchangesConfig(path string) (*GlobalExchangesConfig, error) {
 }
 
 // SaveGlobalExchangesConfig saves the global exchanges config to exchanges.yml
-func SaveGlobalExchangesConfig(path string, config *GlobalExchangesConfig) error {
+func SaveGlobalExchangesConfig(path string, config *Exchange) error {
 	data, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal exchanges config: %w", err)
@@ -300,97 +292,4 @@ func parseStatus(status string) StrategyStatus {
 	default:
 		return StatusReady
 	}
-}
-
-// CompileService interface for compilation operations
-type CompileService interface {
-	CompileStrategy(strategyPath string) error
-	PreCompileStrategies(strategiesDir string) map[string]error
-}
-
-// ExecuteLiveTrading builds and executes the live-trading CLI command
-func ExecuteLiveTrading(strategy *Strategy, exchange *ExchangeConfig, compileSvc CompileService) error {
-	if strategy == nil || exchange == nil {
-		return fmt.Errorf("strategy and exchange must be provided")
-	}
-
-	// Auto-compile strategy if needed
-	if compileSvc != nil {
-		if err := compileSvc.CompileStrategy(strategy.Path); err != nil {
-			return fmt.Errorf("failed to compile strategy: %w", err)
-		}
-	}
-
-	// Get the .so file path
-	strategyName := filepath.Base(strategy.Path)
-	soPath, err := filepath.Abs(filepath.Join(strategy.Path, strategyName+".so"))
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path for strategy: %w", err)
-	}
-
-	// Final check if .so file exists (should exist after compilation)
-	if _, err := os.Stat(soPath); os.IsNotExist(err) {
-		return fmt.Errorf("strategy plugin not found after compilation: %s", soPath)
-	}
-
-	// Path to kronos-live binary
-	// TODO: Make this configurable or discover it automatically
-	kronosLivePath := "/Users/williamr/Documents/holdex/repos/live-trading/bin/kronos-live"
-
-	// Check if kronos-live exists
-	if _, err := os.Stat(kronosLivePath); os.IsNotExist(err) {
-		return fmt.Errorf("kronos-live binary not found: %s", kronosLivePath)
-	}
-
-	// Build command arguments
-	args := []string{"run", "--exchange", exchange.Name, "--strategy", soPath}
-
-	// Add exchange-specific flags
-	switch exchange.Name {
-	case "paradex":
-		if accountAddr, ok := exchange.Credentials["account_address"]; ok && accountAddr != "" {
-			args = append(args, "--paradex-account-address", accountAddr)
-		} else {
-			return fmt.Errorf("paradex account address is required")
-		}
-
-		if ethKey, ok := exchange.Credentials["eth_private_key"]; ok && ethKey != "" {
-			args = append(args, "--paradex-eth-private-key", ethKey)
-		} else {
-			return fmt.Errorf("paradex eth private key is required")
-		}
-
-		if l2Key, ok := exchange.Credentials["l2_private_key"]; ok && l2Key != "" {
-			args = append(args, "--paradex-l2-private-key", l2Key)
-		}
-
-		if exchange.Network != "" {
-			args = append(args, "--paradex-network", exchange.Network)
-		}
-
-	case "bybit", "binance", "kraken":
-		if apiKey, ok := exchange.Credentials["api_key"]; ok && apiKey != "" {
-			args = append(args, "--api-key", apiKey)
-		} else {
-			return fmt.Errorf("%s api key is required", exchange.Name)
-		}
-
-		if apiSecret, ok := exchange.Credentials["api_secret"]; ok && apiSecret != "" {
-			args = append(args, "--api-secret", apiSecret)
-		} else {
-			return fmt.Errorf("%s api secret is required", exchange.Name)
-		}
-
-	default:
-		return fmt.Errorf("unsupported exchange: %s", exchange.Name)
-	}
-
-	// Create and execute the command
-	cmd := exec.Command(kronosLivePath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	// Run the command (this will block until the user stops it with Ctrl+C)
-	return cmd.Run()
 }

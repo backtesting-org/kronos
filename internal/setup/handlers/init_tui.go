@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/backtesting-org/kronos-cli/internal/setup/scaffold"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/backtesting-org/kronos-cli/internal/scaffold"
 )
 
 // Screen types for init flow
@@ -28,14 +28,14 @@ type StrategyTemplate struct {
 
 // InitTUIModel represents the init flow TUI state
 type InitTUIModel struct {
-	screen             InitScreen
-	cursor             int
-	strategies         []StrategyTemplate
-	selectedStrategy   *StrategyTemplate
-	projectName        string
-	projectNameInput   string
-	err                error
-	loadingStrategies  bool
+	screen            InitScreen
+	cursor            int
+	strategies        []StrategyTemplate
+	selectedStrategy  *StrategyTemplate
+	projectName       string
+	projectNameInput  string
+	err               error
+	loadingStrategies bool
 }
 
 func NewInitTUIModel(strategies []StrategyTemplate) InitTUIModel {

@@ -1,22 +1,22 @@
 package handlers
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/services"
+	"github.com/backtesting-org/kronos-cli/internal/setup/types"
 	"github.com/spf13/cobra"
 )
 
 // InitHandler handles the init command
-type InitHandler struct {
-	scaffoldService *services.ScaffoldService
+type initHandler struct {
+	scaffoldService types.ScaffoldService
 }
 
-func NewInitHandler(scaffoldService *services.ScaffoldService) *InitHandler {
-	return &InitHandler{
+func NewInitHandler(scaffoldService types.ScaffoldService) types.InitHandler {
+	return &initHandler{
 		scaffoldService: scaffoldService,
 	}
 }
 
-func (h *InitHandler) Handle(cmd *cobra.Command, args []string) error {
+func (h *initHandler) Handle(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		// Run interactive TUI flow
 		strategyExample, projectName, err := RunInitTUI()
@@ -30,6 +30,6 @@ func (h *InitHandler) Handle(cmd *cobra.Command, args []string) error {
 	return h.scaffoldService.CreateProject(name)
 }
 
-func (h *InitHandler) HandleWithStrategy(strategyExample, name string) error {
+func (h *initHandler) HandleWithStrategy(strategyExample, name string) error {
 	return h.scaffoldService.CreateProjectWithStrategy(name, strategyExample)
 }

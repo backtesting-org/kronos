@@ -10,12 +10,17 @@ import (
 	"github.com/spf13/afero"
 )
 
-type Scaffolder struct {
+type Scaffolder interface {
+	CreateProject(name string) error
+	CreateProjectWithStrategy(name, strategyExample string) error
+}
+
+type scaffolder struct {
 	fs afero.Fs
 }
 
-func NewScaffolder() *Scaffolder {
-	return &Scaffolder{
+func NewScaffolder() Scaffolder {
+	return &scaffolder{
 		fs: afero.NewOsFs(),
 	}
 }
@@ -26,11 +31,11 @@ type ProjectData struct {
 	StrategyPackage string
 }
 
-func (s *Scaffolder) CreateProject(name string) error {
+func (s *scaffolder) CreateProject(name string) error {
 	return s.CreateProjectWithStrategy(name, "mean_reversion")
 }
 
-func (s *Scaffolder) CreateProjectWithStrategy(name, strategyExample string) error {
+func (s *scaffolder) CreateProjectWithStrategy(name, strategyExample string) error {
 	green := color.New(color.FgGreen, color.Bold)
 	fmt.Printf("🚀 Creating Kronos project: %s\n\n", green.Sprint(name))
 
@@ -54,7 +59,7 @@ func (s *Scaffolder) CreateProjectWithStrategy(name, strategyExample string) err
 	return nil
 }
 
-func (s *Scaffolder) generateFiles(name, strategyExample string, data ProjectData) error {
+func (s *scaffolder) generateFiles(name, strategyExample string, data ProjectData) error {
 	// Git clone with sparse checkout directly to project directory
 	fmt.Printf("  📦 Downloading %s example from GitHub...\n", strategyExample)
 
@@ -123,7 +128,7 @@ func (s *Scaffolder) generateFiles(name, strategyExample string, data ProjectDat
 	return nil
 }
 
-func (s *Scaffolder) generateRootFiles(name, strategyExample string, data ProjectData) error {
+func (s *scaffolder) generateRootFiles(name, strategyExample string, data ProjectData) error {
 	// Generate go.mod
 	goModContent := fmt.Sprintf(`module %s
 
@@ -168,7 +173,7 @@ For more information, visit: https://github.com/backtesting-org/kronos-sdk
 	return nil
 }
 
-func (s *Scaffolder) generateConfigFiles(name, strategyExample string) error {
+func (s *scaffolder) generateConfigFiles(name, strategyExample string) error {
 	// Note: config.yml comes from the SDK example and contains only metadata
 	// We do NOT generate it here - it's downloaded with the strategy
 
@@ -237,7 +242,7 @@ bin/
 	return nil
 }
 
-func (s *Scaffolder) printSuccess(name, strategyExample string) {
+func (s *scaffolder) printSuccess(name, strategyExample string) {
 	blue := color.New(color.FgBlue)
 
 	fmt.Printf("\n✅ Project created successfully!\n\n")

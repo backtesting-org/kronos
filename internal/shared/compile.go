@@ -1,4 +1,4 @@
-package services
+package shared
 
 import (
 	"fmt"
@@ -7,15 +7,22 @@ import (
 	"path/filepath"
 )
 
-// CompileService handles compilation of strategies into .so plugins
-type CompileService struct{}
+type CompileService interface {
+	CompileStrategy(strategyPath string) error
+	PreCompileStrategies(strategiesDir string) map[string]error
+	IsCompiled(strategyPath string) bool
+	NeedsRecompile(strategyPath string) bool
+}
 
-func NewCompileService() *CompileService {
-	return &CompileService{}
+// compileService handles compilation of strategies into .so plugins
+type compileService struct{}
+
+func NewCompileService() CompileService {
+	return &compileService{}
 }
 
 // CompileStrategy compiles a strategy's .go file into a .so plugin if needed
-func (s *CompileService) CompileStrategy(strategyPath string) error {
+func (s *compileService) CompileStrategy(strategyPath string) error {
 	strategyName := filepath.Base(strategyPath)
 	strategyGoPath := filepath.Join(strategyPath, "strategy.go")
 	soPath := filepath.Join(strategyPath, strategyName+".so")
@@ -69,7 +76,7 @@ func (s *CompileService) CompileStrategy(strategyPath string) error {
 
 // PreCompileStrategies scans and compiles all strategies in the strategies directory
 // Returns a map of strategy names to compilation errors (if any)
-func (s *CompileService) PreCompileStrategies(strategiesDir string) map[string]error {
+func (s *compileService) PreCompileStrategies(strategiesDir string) map[string]error {
 	errors := make(map[string]error)
 
 	// Check if strategies directory exists
@@ -102,7 +109,7 @@ func (s *CompileService) PreCompileStrategies(strategiesDir string) map[string]e
 }
 
 // IsCompiled checks if a strategy has a compiled .so file
-func (s *CompileService) IsCompiled(strategyPath string) bool {
+func (s *compileService) IsCompiled(strategyPath string) bool {
 	strategyName := filepath.Base(strategyPath)
 	soPath := filepath.Join(strategyPath, strategyName+".so")
 	_, err := os.Stat(soPath)
@@ -110,7 +117,7 @@ func (s *CompileService) IsCompiled(strategyPath string) bool {
 }
 
 // NeedsRecompile checks if a strategy needs to be recompiled
-func (s *CompileService) NeedsRecompile(strategyPath string) bool {
+func (s *compileService) NeedsRecompile(strategyPath string) bool {
 	strategyName := filepath.Base(strategyPath)
 	strategyGoPath := filepath.Join(strategyPath, "strategy.go")
 	soPath := filepath.Join(strategyPath, strategyName+".so")

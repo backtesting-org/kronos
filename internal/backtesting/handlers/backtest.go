@@ -3,24 +3,25 @@ package handlers
 import (
 	"fmt"
 
-	"github.com/backtesting-org/kronos-cli/internal/services"
+	"github.com/backtesting-org/kronos-cli/internal/backtesting/types"
+	"github.com/backtesting-org/kronos-cli/internal/shared"
 	"github.com/spf13/cobra"
 )
 
-// BacktestHandler handles the backtest command
-type BacktestHandler struct {
-	backtestService *services.BacktestService
-	compileService  *services.CompileService
+// backtestHandler handles the backtest command
+type backtestHandler struct {
+	backtestService types.BacktestService
+	compileService  shared.CompileService
 }
 
-func NewBacktestHandler(backtestService *services.BacktestService, compileService *services.CompileService) *BacktestHandler {
-	return &BacktestHandler{
+func NewBacktestHandler(backtestService types.BacktestService, compileService shared.CompileService) types.BacktestHandler {
+	return &backtestHandler{
 		backtestService: backtestService,
 		compileService:  compileService,
 	}
 }
 
-func (h *BacktestHandler) Handle(cmd *cobra.Command, args []string) error {
+func (h *backtestHandler) Handle(cmd *cobra.Command, args []string) error {
 	interactiveMode, _ := cmd.Flags().GetBool("interactive")
 	configPath, _ := cmd.Flags().GetString("config")
 

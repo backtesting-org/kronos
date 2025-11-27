@@ -22,6 +22,7 @@ func main() {
 		fx.WithLogger(func() fxevent.Logger {
 			return &fxevent.ZapLogger{Logger: logger}
 		}),
+		fx.NopLogger, // Suppress fx startup logs
 	)
 
 	app.Run()
@@ -33,10 +34,13 @@ func runCLI(lc fx.Lifecycle, shutdowner fx.Shutdowner, commands *cmd.Commands) {
 			// Run the CLI in a goroutine so fx can manage lifecycle
 			go func() {
 				if err := commands.Root.Execute(); err != nil {
+					log.Printf("Error executing command: %v\n", err)
 					log.Fatal(err)
 				}
 				// Shut down fx app after CLI command completes
-				shutdowner.Shutdown()
+				if err := shutdowner.Shutdown(); err != nil {
+					log.Printf("Error shutting down: %v\n", err)
+				}
 			}()
 			return nil
 		},

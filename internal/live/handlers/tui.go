@@ -1,10 +1,12 @@
-package live
+package handlers
 
 import (
 	"fmt"
 	"path/filepath"
 	"strings"
 
+	"github.com/backtesting-org/kronos-cli/internal/live/types"
+	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -27,33 +29,32 @@ const (
 	visibleStrategies = 3
 )
 
-// SelectionModel is the Bubble Tea model for strategy selection
+// SelectionModel is the Bubble Tea model for strategy selection (pure view layer)
 type SelectionModel struct {
-	strategies         []Strategy
-	cursor             int
-	scrollOffset       int
-	selected           *Strategy
-	selectedExchange   *ExchangeConfig
-	globalExchanges    *GlobalExchangesConfig  // Global exchanges config
-	compileSvc         CompileService          // Compile service for building strategies
-	currentScreen      Screen
-	confirmInput       string
-	width              int
-	height             int
-	err                error
+	strategies       []types.Strategy
+	cursor           int
+	scrollOffset     int
+	selected         *types.Strategy
+	selectedExchange *types.ExchangeConfig
+	connectors       types.Connectors
+	currentScreen    Screen
+	confirmInput     string
+	width            int
+	height           int
+	err              error
 
-	// Exchange selection
-	exchangeCursor     int
+	// Connectors selection
+	exchangeCursor int
 
 	// Credential input fields
-	credentialFields   []string
-	currentField       int
-	fieldInputs        map[string]string
-	showPassword       bool
+	credentialFields []string
+	currentField     int
+	fieldInputs      map[string]string
+	showPassword     bool
 }
 
-// NewSelectionModel creates a new strategy selection model
-func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesConfig, compileSvc CompileService) SelectionModel {
+// NewSelectionModel creates a new strategy selection model (view only)
+func NewSelectionModel(strategies []types.Strategy, connectors types.Connectors) SelectionModel {
 	// If no strategies, start with empty state screen
 	initialScreen := ScreenSelection
 	if len(strategies) == 0 {
@@ -61,14 +62,13 @@ func NewSelectionModel(strategies []Strategy, globalExchanges *GlobalExchangesCo
 	}
 
 	return SelectionModel{
-		strategies:      strategies,
-		globalExchanges: globalExchanges,
-		compileSvc:      compileSvc,
-		cursor:          0,
-		currentScreen:   initialScreen,
-		width:           80,
-		height:          24,
-		fieldInputs:     make(map[string]string),
+		strategies:    strategies,
+		connectors:    connectors,
+		cursor:        0,
+		currentScreen: initialScreen,
+		width:         80,
+		height:        24,
+		fieldInputs:   make(map[string]string),
 	}
 }
 
@@ -78,23 +78,18 @@ func (m SelectionModel) Err() error {
 }
 
 // Selected returns the selected strategy
-func (m SelectionModel) Selected() *Strategy {
+func (m SelectionModel) Selected() *types.Strategy {
 	return m.selected
 }
 
 // SelectedExchange returns the selected exchange
-func (m SelectionModel) SelectedExchange() *ExchangeConfig {
+func (m SelectionModel) SelectedExchange() *types.ExchangeConfig {
 	return m.selectedExchange
 }
 
 // CurrentScreen returns the current screen
 func (m SelectionModel) CurrentScreen() Screen {
 	return m.currentScreen
-}
-
-// GlobalExchanges returns the global exchanges config
-func (m SelectionModel) GlobalExchanges() *GlobalExchangesConfig {
-	return m.globalExchanges
 }
 
 func (m SelectionModel) Init() tea.Cmd {
@@ -170,7 +165,7 @@ func (m SelectionModel) updateSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter", " ":
 		// Check if the selected strategy has an error
-		if m.strategies[m.cursor].Status == StatusError {
+		if m.strategies[m.cursor].Status == types.StatusError {
 			// Don't allow selection of strategies with errors
 			return m, nil
 		}
@@ -291,17 +286,18 @@ func (m SelectionModel) updateCredentials(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // getAvailableExchangesForStrategy returns the list of exchange configs available for the selected strategy
-func (m *SelectionModel) getAvailableExchangesForStrategy() []*ExchangeConfig {
-	if m.selected == nil || m.globalExchanges == nil {
-		return []*ExchangeConfig{}
+// Pure view logic - just filters based on what's already loaded
+func (m *SelectionModel) getAvailableExchangesForStrategy() []*types.ExchangeConfig {
+	if m.selected == nil {
+		return []*types.ExchangeConfig{}
 	}
 
-	var available []*ExchangeConfig
+	var available []*types.ExchangeConfig
 	for _, exchangeName := range m.selected.Config.Exchanges {
-		// Find this exchange in global config
-		for i := range m.globalExchanges.Exchanges {
-			if m.globalExchanges.Exchanges[i].Name == exchangeName && m.globalExchanges.Exchanges[i].Enabled {
-				available = append(available, &m.globalExchanges.Exchanges[i])
+		// Find this exchange in connectors
+		for i := range m.connectors.Exchanges {
+			if m.connectors.Exchanges[i].Name == exchangeName && m.connectors.Exchanges[i].Enabled {
+				available = append(available, &m.connectors.Exchanges[i])
 				break
 			}
 		}
@@ -310,7 +306,8 @@ func (m *SelectionModel) getAvailableExchangesForStrategy() []*ExchangeConfig {
 	return available
 }
 
-// setupCredentialFields determines what credential fields are needed based on the selected exchange
+// setupCredentialFields determines what credential fields to show in the UI
+// Pure view logic - just maps exchange type to field names
 func (m *SelectionModel) setupCredentialFields() {
 	if m.selectedExchange == nil {
 		return
@@ -319,49 +316,30 @@ func (m *SelectionModel) setupCredentialFields() {
 	m.currentField = 0
 	m.fieldInputs = make(map[string]string)
 
-	// Determine required fields based on exchange
+	// Map exchange type to credential field names
 	switch m.selectedExchange.Name {
 	case "paradex":
-		m.credentialFields = []string{
-			"account_address",
-			"eth_private_key",
-			"l2_private_key",
-		}
-		// Pre-fill with existing values if any
-		if m.selectedExchange.Credentials != nil {
-			for _, field := range m.credentialFields {
-				if val, ok := m.selectedExchange.Credentials[field]; ok {
-					m.fieldInputs[field] = val
-				} else {
-					m.fieldInputs[field] = ""
-				}
-			}
-		}
-
+		m.credentialFields = []string{"account_address", "eth_private_key", "l2_private_key"}
 	case "bybit", "binance", "kraken":
-		m.credentialFields = []string{
-			"api_key",
-			"api_secret",
-		}
-		// Pre-fill with existing values if any
-		if m.selectedExchange.Credentials != nil {
-			for _, field := range m.credentialFields {
-				if val, ok := m.selectedExchange.Credentials[field]; ok {
-					m.fieldInputs[field] = val
-				} else {
-					m.fieldInputs[field] = ""
-				}
+		m.credentialFields = []string{"api_key", "api_secret"}
+	default:
+		m.credentialFields = []string{"api_key", "api_secret"}
+	}
+
+	// Pre-fill with existing values if any
+	if m.selectedExchange.Credentials != nil {
+		for _, field := range m.credentialFields {
+			if val, ok := m.selectedExchange.Credentials[field]; ok {
+				m.fieldInputs[field] = val
+			} else {
+				m.fieldInputs[field] = ""
 			}
 		}
-
-	default:
-		// Generic API key/secret for unknown exchanges
-		m.credentialFields = []string{
-			"api_key",
-			"api_secret",
+	} else {
+		// Initialize empty values
+		for _, field := range m.credentialFields {
+			m.fieldInputs[field] = ""
 		}
-		m.fieldInputs["api_key"] = ""
-		m.fieldInputs["api_secret"] = ""
 	}
 }
 
@@ -418,8 +396,8 @@ func (m SelectionModel) renderEmptyState() string {
 	var b strings.Builder
 
 	// Title
-	title := TitleStyle.Render("🚀 KRONOS LIVE TRADING")
-	subtitle := SubtitleStyle.Render("No strategies found")
+	title := ui.TitleStyle.Render("🚀 KRONOS LIVE TRADING")
+	subtitle := ui.SubtitleStyle.Render("No strategies found")
 
 	b.WriteString("\n\n")
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, title))
@@ -430,16 +408,16 @@ func (m SelectionModel) renderEmptyState() string {
 	// Message box
 	message := []string{
 		"",
-		ConfirmFieldStyle.Render("No strategies found in ./strategies/"),
+		ui.ConfirmFieldStyle.Render("No strategies found in ./strategies/"),
 		"",
-		StrategyMetaStyle.Render("To deploy strategies to live trading, you need to:"),
+		ui.StrategyMetaStyle.Render("To deploy strategies to live trading, you need to:"),
 		"",
-		StrategyDescStyle.Render("  1. Initialize a new Kronos project"),
-		StrategyDescStyle.Render("  2. Create strategies in ./strategies/ directory"),
-		StrategyDescStyle.Render("  3. Configure exchanges.yml with your credentials"),
+		ui.StrategyDescStyle.Render("  1. Initialize a new Kronos project"),
+		ui.StrategyDescStyle.Render("  2. Create strategies in ./strategies/ directory"),
+		ui.StrategyDescStyle.Render("  3. Configure exchanges.yml with your credentials"),
 		"",
 		"",
-		ConfirmFieldStyle.Render("Would you like to initialize a new Kronos project here?"),
+		ui.ConfirmFieldStyle.Render("Would you like to initialize a new Kronos project here?"),
 		"",
 	}
 
@@ -447,8 +425,8 @@ func (m SelectionModel) renderEmptyState() string {
 
 	// Options
 	b.WriteString("\n")
-	yesOption := StrategyNameSelectedStyle.Render("Y") + StrategyDescStyle.Render(" Yes, initialize new project")
-	noOption := StrategyMetaStyle.Render("Q") + StrategyDescStyle.Render(" No, quit")
+	yesOption := ui.StrategyNameSelectedStyle.Render("Y") + ui.StrategyDescStyle.Render(" Yes, initialize new project")
+	noOption := ui.StrategyMetaStyle.Render("Q") + ui.StrategyDescStyle.Render(" No, quit")
 
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, yesOption))
 	b.WriteString("\n")
@@ -456,11 +434,11 @@ func (m SelectionModel) renderEmptyState() string {
 	b.WriteString("\n\n")
 
 	// Help
-	help := HelpStyle.Render("Y Initialize  Q Quit")
+	help := ui.HelpStyle.Render("Y Initialize  Q Quit")
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
 
 	// Wrap in box
-	boxed := BoxStyle.Render(b.String())
+	boxed := ui.BoxStyle.Render(b.String())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
 }
 
@@ -468,8 +446,8 @@ func (m SelectionModel) renderSelection() string {
 	var b strings.Builder
 
 	// Title
-	title := TitleStyle.Render("🚀 KRONOS LIVE TRADING")
-	subtitle := SubtitleStyle.Render("Select a strategy to deploy")
+	title := ui.TitleStyle.Render("🚀 KRONOS LIVE TRADING")
+	subtitle := ui.SubtitleStyle.Render("Select a strategy to deploy")
 
 	b.WriteString("\n")
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, title))
@@ -486,7 +464,7 @@ func (m SelectionModel) renderSelection() string {
 
 	// Show scroll indicators
 	if m.scrollOffset > 0 {
-		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, HelpStyle.Render("↑ More strategies above")))
+		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, ui.HelpStyle.Render("↑ More strategies above")))
 		b.WriteString("\n")
 	}
 
@@ -498,18 +476,18 @@ func (m SelectionModel) renderSelection() string {
 		}
 
 		// Build strategy item
-		statusIndicator := GetStatusIndicator(strategy.Status)
+		statusIndicator := ui.GetStatusIndicator(strategy.Status)
 
 		name := strategy.Name
 		if m.cursor == i {
-			name = StrategyNameSelectedStyle.Render(name)
+			name = ui.StrategyNameSelectedStyle.Render(name)
 		} else {
-			name = StrategyNameStyle.Render(name)
+			name = ui.StrategyNameStyle.Render(name)
 		}
 
-		description := StrategyDescStyle.Render(strategy.Description)
+		description := ui.StrategyDescStyle.Render(strategy.Description)
 
-		// Exchange and asset info
+		// Connectors and asset info
 		exchangeNames := []string{}
 		assetCount := 0
 		for _, ex := range strategy.Exchanges {
@@ -518,8 +496,8 @@ func (m SelectionModel) renderSelection() string {
 				assetCount += len(ex.Assets)
 			}
 		}
-		meta := StrategyMetaStyle.Render(fmt.Sprintf(
-			"Exchanges: %s | Assets: %d",
+		meta := ui.StrategyMetaStyle.Render(fmt.Sprintf(
+			"Connectors: %s | Assets: %d",
 			strings.Join(exchangeNames, ", "),
 			assetCount,
 		))
@@ -533,16 +511,16 @@ func (m SelectionModel) renderSelection() string {
 		)
 
 		// Add error message if strategy has an error and is selected
-		if strategy.Status == StatusError && strategy.Error != "" && m.cursor == i {
-			errorMsg := StatusErrorStyle.Render(fmt.Sprintf("⚠ Error: %s", strategy.Error))
+		if strategy.Status == types.StatusError && strategy.Error != "" && m.cursor == i {
+			errorMsg := ui.StatusErrorStyle.Render(fmt.Sprintf("⚠ Error: %s", strategy.Error))
 			itemContent += "\n" + errorMsg
 		}
 
 		var item string
 		if m.cursor == i {
-			item = StrategyItemSelectedStyle.Render(cursor + itemContent)
+			item = ui.StrategyItemSelectedStyle.Render(cursor + itemContent)
 		} else {
-			item = StrategyItemStyle.Render(cursor + itemContent)
+			item = ui.StrategyItemStyle.Render(cursor + itemContent)
 		}
 
 		// Center the item
@@ -553,15 +531,15 @@ func (m SelectionModel) renderSelection() string {
 	// Show scroll indicator if more below
 	if visibleEnd < len(m.strategies) {
 		b.WriteString("\n")
-		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, HelpStyle.Render("↓ More strategies below")))
+		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, ui.HelpStyle.Render("↓ More strategies below")))
 	}
 
 	// Help text
-	help := HelpStyle.Render("↑↓/jk Navigate  ↵ Select  q Quit")
+	help := ui.HelpStyle.Render("↑↓/jk Navigate  ↵ Select  q Quit")
 
 	// Check if current strategy has error to show additional help
-	if m.cursor < len(m.strategies) && m.strategies[m.cursor].Status == StatusError {
-		help += "\n" + StatusErrorStyle.Render("  ⚠ Cannot select strategy with errors")
+	if m.cursor < len(m.strategies) && m.strategies[m.cursor].Status == types.StatusError {
+		help += "\n" + ui.StatusErrorStyle.Render("  ⚠ Cannot select strategy with errors")
 	}
 
 	b.WriteString("\n")
@@ -580,8 +558,8 @@ func (m SelectionModel) renderExchangeSelection() string {
 	var b strings.Builder
 
 	// Title
-	title := TitleStyle.Render("SELECT EXCHANGE")
-	subtitle := SubtitleStyle.Render(fmt.Sprintf("Choose exchange for %s strategy", m.selected.Name))
+	title := ui.TitleStyle.Render("SELECT EXCHANGE")
+	subtitle := ui.SubtitleStyle.Render(fmt.Sprintf("Choose exchange for %s strategy", m.selected.Name))
 
 	b.WriteString("\n")
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, title))
@@ -589,7 +567,7 @@ func (m SelectionModel) renderExchangeSelection() string {
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, subtitle))
 	b.WriteString("\n\n")
 
-	// Exchange list
+	// Connectors list
 	for i, exConfig := range availableExchanges {
 		cursor := "  "
 		if m.exchangeCursor == i {
@@ -599,18 +577,18 @@ func (m SelectionModel) renderExchangeSelection() string {
 		// Build exchange item
 		name := exConfig.Name
 		if m.exchangeCursor == i {
-			name = StrategyNameSelectedStyle.Render(name)
+			name = ui.StrategyNameSelectedStyle.Render(name)
 		} else {
-			name = StrategyNameStyle.Render(name)
+			name = ui.StrategyNameStyle.Render(name)
 		}
 
 		// Get assets for this exchange from strategy config
 		assets := m.selected.Config.Assets[exConfig.Name]
-		assetInfo := StrategyMetaStyle.Render(fmt.Sprintf("Assets: %s", strings.Join(assets, ", ")))
+		assetInfo := ui.StrategyMetaStyle.Render(fmt.Sprintf("Assets: %s", strings.Join(assets, ", ")))
 
 		networkInfo := ""
 		if exConfig.Network != "" {
-			networkInfo = StrategyMetaStyle.Render(fmt.Sprintf("Network: %s", exConfig.Network))
+			networkInfo = ui.StrategyMetaStyle.Render(fmt.Sprintf("Network: %s", exConfig.Network))
 		}
 
 		itemContent := fmt.Sprintf("%s\n%s", name, assetInfo)
@@ -620,9 +598,9 @@ func (m SelectionModel) renderExchangeSelection() string {
 
 		var item string
 		if m.exchangeCursor == i {
-			item = StrategyItemSelectedStyle.Render(cursor + itemContent)
+			item = ui.StrategyItemSelectedStyle.Render(cursor + itemContent)
 		} else {
-			item = StrategyItemStyle.Render(cursor + itemContent)
+			item = ui.StrategyItemStyle.Render(cursor + itemContent)
 		}
 
 		b.WriteString(lipgloss.Place(m.width, lipgloss.Height(item), lipgloss.Center, lipgloss.Top, item))
@@ -630,7 +608,7 @@ func (m SelectionModel) renderExchangeSelection() string {
 	}
 
 	// Help text
-	help := HelpStyle.Render("↑↓/jk Navigate  ↵ Select  esc Back  ctrl+c Quit")
+	help := ui.HelpStyle.Render("↑↓/jk Navigate  ↵ Select  esc Back  ctrl+c Quit")
 	b.WriteString("\n")
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
 
@@ -645,8 +623,8 @@ func (m SelectionModel) renderCredentials() string {
 	var b strings.Builder
 
 	// Title
-	title := TitleStyle.Render(fmt.Sprintf("🔐 %s CREDENTIALS", strings.ToUpper(m.selectedExchange.Name)))
-	subtitle := SubtitleStyle.Render("Enter your API credentials")
+	title := ui.TitleStyle.Render(fmt.Sprintf("🔐 %s CREDENTIALS", strings.ToUpper(m.selectedExchange.Name)))
+	subtitle := ui.SubtitleStyle.Render("Enter your API credentials")
 
 	b.WriteString("\n\n")
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, title))
@@ -660,7 +638,7 @@ func (m SelectionModel) renderCredentials() string {
 		displayName := strings.ReplaceAll(field, "_", " ")
 		displayName = strings.Title(displayName)
 
-		label := ConfirmFieldStyle.Render(displayName + ":")
+		label := ui.ConfirmFieldStyle.Render(displayName + ":")
 
 		// Get current input value
 		inputValue := m.fieldInputs[field]
@@ -674,9 +652,9 @@ func (m SelectionModel) renderCredentials() string {
 
 		// Highlight current field
 		if i == m.currentField {
-			inputValue = ConfirmValueStyle.Render(inputValue + "█") // Cursor
+			inputValue = ui.ConfirmValueStyle.Render(inputValue + "█") // Cursor
 		} else {
-			inputValue = StrategyMetaStyle.Render(inputValue)
+			inputValue = ui.StrategyMetaStyle.Render(inputValue)
 		}
 
 		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, label+" "+inputValue))
@@ -685,7 +663,7 @@ func (m SelectionModel) renderCredentials() string {
 
 	// Help text
 	b.WriteString("\n")
-	help := HelpStyle.Render("↑↓/tab Navigate  ↵ Next/Continue  esc Back  ctrl+c Quit")
+	help := ui.HelpStyle.Render("↑↓/tab Navigate  ↵ Next/Continue  esc Back  ctrl+c Quit")
 	b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, help))
 
 	return b.String()
@@ -699,7 +677,7 @@ func (m SelectionModel) renderConfirmation() string {
 	var b strings.Builder
 
 	// Title
-	title := ConfirmTitleStyle.Render("⚠️  CONFIRM DEPLOYMENT")
+	title := ui.ConfirmTitleStyle.Render("⚠️  CONFIRM DEPLOYMENT")
 	b.WriteString("\n\n")
 	b.WriteString(title)
 	b.WriteString("\n\n")
@@ -709,47 +687,47 @@ func (m SelectionModel) renderConfirmation() string {
 
 	// Strategy name
 	details = append(details, fmt.Sprintf("%s  %s",
-		ConfirmFieldStyle.Render("Strategy:"),
-		ConfirmValueStyle.Render(m.selected.Name),
+		ui.ConfirmFieldStyle.Render("Strategy:"),
+		ui.ConfirmValueStyle.Render(m.selected.Name),
 	))
 
 	// Selected exchange and assets
 	if m.selectedExchange != nil {
 		details = append(details, fmt.Sprintf("%s  %s",
-			ConfirmFieldStyle.Render("Exchange:"),
-			ConfirmValueStyle.Render(m.selectedExchange.Name),
+			ui.ConfirmFieldStyle.Render("Connectors:"),
+			ui.ConfirmValueStyle.Render(m.selectedExchange.Name),
 		))
 
 		if m.selectedExchange.Network != "" {
 			details = append(details, fmt.Sprintf("%s  %s",
-				ConfirmFieldStyle.Render("Network:"),
-				ConfirmValueStyle.Render(m.selectedExchange.Network),
+				ui.ConfirmFieldStyle.Render("Network:"),
+				ui.ConfirmValueStyle.Render(m.selectedExchange.Network),
 			))
 		}
 
 		// Get assets from strategy config
 		assets := m.selected.Config.Assets[m.selectedExchange.Name]
 		details = append(details, fmt.Sprintf("%s  %s",
-			ConfirmFieldStyle.Render("Assets:"),
-			ConfirmValueStyle.Render(strings.Join(assets, ", ")),
+			ui.ConfirmFieldStyle.Render("Assets:"),
+			ui.ConfirmValueStyle.Render(strings.Join(assets, ", ")),
 		))
 	}
 
 	// Mode
-	modeIndicator := GetModeIndicator(m.selected.Config.Execution.DryRun)
+	modeIndicator := ui.GetModeIndicator(m.selected.Config.Execution.DryRun)
 	details = append(details, fmt.Sprintf("%s  %s",
-		ConfirmFieldStyle.Render("Mode:"),
+		ui.ConfirmFieldStyle.Render("Mode:"),
 		modeIndicator,
 	))
 
 	// Risk limits
 	details = append(details, "")
-	details = append(details, ConfirmFieldStyle.Render("Risk Limits:"))
+	details = append(details, ui.ConfirmFieldStyle.Render("Risk Limits:"))
 	details = append(details, fmt.Sprintf("  Max Position: %s",
-		ConfirmValueStyle.Render(fmt.Sprintf("$%.0f", m.selected.Config.Risk.MaxPositionSize)),
+		ui.ConfirmValueStyle.Render(fmt.Sprintf("$%.0f", m.selected.Config.Risk.MaxPositionSize)),
 	))
 	details = append(details, fmt.Sprintf("  Max Daily Loss: %s",
-		ConfirmValueStyle.Render(fmt.Sprintf("$%.0f", m.selected.Config.Risk.MaxDailyLoss)),
+		ui.ConfirmValueStyle.Render(fmt.Sprintf("$%.0f", m.selected.Config.Risk.MaxDailyLoss)),
 	))
 
 	detailsText := strings.Join(details, "\n")
@@ -758,7 +736,7 @@ func (m SelectionModel) renderConfirmation() string {
 
 	// Warning if live trading
 	if !m.selected.Config.Execution.DryRun {
-		warning := ConfirmWarningStyle.Render("🔴 This will execute real trades with real money!")
+		warning := ui.ConfirmWarningStyle.Render("🔴 This will execute real trades with real money!")
 		b.WriteString("\n")
 		b.WriteString(warning)
 		b.WriteString("\n")
@@ -766,17 +744,17 @@ func (m SelectionModel) renderConfirmation() string {
 
 	// Confirmation input prompt
 	b.WriteString("\n")
-	b.WriteString(ConfirmFieldStyle.Render("Type 'CONFIRM' to proceed: "))
-	b.WriteString(ConfirmValueStyle.Render(m.confirmInput))
+	b.WriteString(ui.ConfirmFieldStyle.Render("Type 'CONFIRM' to proceed: "))
+	b.WriteString(ui.ConfirmValueStyle.Render(m.confirmInput))
 	b.WriteString("\n")
 
 	// Help
 	b.WriteString("\n")
-	help := HelpStyle.Render("↵ Proceed  esc Cancel  ctrl+c Quit")
+	help := ui.HelpStyle.Render("↵ Proceed  esc Cancel  ctrl+c Quit")
 	b.WriteString(help)
 
 	// Wrap in box
-	boxed := ConfirmBoxStyle.Render(b.String())
+	boxed := ui.ConfirmBoxStyle.Render(b.String())
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
 }
@@ -789,8 +767,8 @@ func (m SelectionModel) renderSuccess() string {
 	var b strings.Builder
 
 	// Success message
-	successIcon := StatusReadyStyle.Render("✓")
-	title := StrategyNameSelectedStyle.Render(fmt.Sprintf("Strategy '%s' deployed successfully!", m.selected.Name))
+	successIcon := ui.StatusReadyStyle.Render("✓")
+	title := ui.StrategyNameSelectedStyle.Render(fmt.Sprintf("Strategy '%s' deployed successfully!", m.selected.Name))
 
 	b.WriteString("\n\n")
 	b.WriteString(fmt.Sprintf("%s  %s", successIcon, title))
@@ -811,38 +789,38 @@ func (m SelectionModel) renderSuccess() string {
 		// Build command based on exchange type
 		if m.selectedExchange.Name == "paradex" {
 			nextSteps = append(nextSteps,
-				SubtitleStyle.Render("  kronos-live run \\"),
-				SubtitleStyle.Render(fmt.Sprintf("    --exchange %s \\", m.selectedExchange.Name)),
-				SubtitleStyle.Render(fmt.Sprintf("    --strategy %s \\", soPath)),
+				ui.SubtitleStyle.Render("  kronos-live run \\"),
+				ui.SubtitleStyle.Render(fmt.Sprintf("    --exchange %s \\", m.selectedExchange.Name)),
+				ui.SubtitleStyle.Render(fmt.Sprintf("    --strategy %s \\", soPath)),
 			)
 
 			// Add Paradex-specific flags
 			if accountAddr, ok := m.selectedExchange.Credentials["account_address"]; ok && accountAddr != "" {
-				nextSteps = append(nextSteps, SubtitleStyle.Render(fmt.Sprintf("    --paradex-account-address %s \\", accountAddr)))
+				nextSteps = append(nextSteps, ui.SubtitleStyle.Render(fmt.Sprintf("    --paradex-account-address %s \\", accountAddr)))
 			}
 			if ethKey, ok := m.selectedExchange.Credentials["eth_private_key"]; ok && ethKey != "" {
 				masked := ethKey
 				if len(masked) > 10 {
 					masked = masked[:6] + "..." + masked[len(masked)-4:]
 				}
-				nextSteps = append(nextSteps, SubtitleStyle.Render(fmt.Sprintf("    --paradex-eth-private-key %s \\", masked)))
+				nextSteps = append(nextSteps, ui.SubtitleStyle.Render(fmt.Sprintf("    --paradex-eth-private-key %s \\", masked)))
 			}
 			if l2Key, ok := m.selectedExchange.Credentials["l2_private_key"]; ok && l2Key != "" {
 				masked := l2Key
 				if len(masked) > 10 {
 					masked = masked[:6] + "..." + masked[len(masked)-4:]
 				}
-				nextSteps = append(nextSteps, SubtitleStyle.Render(fmt.Sprintf("    --paradex-l2-private-key %s \\", masked)))
+				nextSteps = append(nextSteps, ui.SubtitleStyle.Render(fmt.Sprintf("    --paradex-l2-private-key %s \\", masked)))
 			}
 			if m.selectedExchange.Network != "" {
-				nextSteps = append(nextSteps, SubtitleStyle.Render(fmt.Sprintf("    --paradex-network %s", m.selectedExchange.Network)))
+				nextSteps = append(nextSteps, ui.SubtitleStyle.Render(fmt.Sprintf("    --paradex-network %s", m.selectedExchange.Network)))
 			}
 		} else {
 			// Generic exchange command
 			nextSteps = append(nextSteps,
-				SubtitleStyle.Render("  kronos-live run \\"),
-				SubtitleStyle.Render(fmt.Sprintf("    --exchange %s \\", m.selectedExchange.Name)),
-				SubtitleStyle.Render(fmt.Sprintf("    --strategy %s", soPath)),
+				ui.SubtitleStyle.Render("  kronos-live run \\"),
+				ui.SubtitleStyle.Render(fmt.Sprintf("    --exchange %s \\", m.selectedExchange.Name)),
+				ui.SubtitleStyle.Render(fmt.Sprintf("    --strategy %s", soPath)),
 			)
 		}
 	}
@@ -850,17 +828,16 @@ func (m SelectionModel) renderSuccess() string {
 	nextSteps = append(nextSteps,
 		"",
 		"",
-		StrategyMetaStyle.Render("Press Enter to start live trading, or Q to quit"),
+		ui.StrategyMetaStyle.Render("Press Enter to start live trading, or Q to quit"),
 		"",
 	)
 
 	b.WriteString(strings.Join(nextSteps, "\n"))
 
-	help := HelpStyle.Render("↵ Start Live Trading  q Quit")
+	help := ui.HelpStyle.Render("↵ Start Live Trading  q Quit")
 	b.WriteString("\n")
 	b.WriteString(help)
 
-	boxed := BoxStyle.Render(b.String())
+	boxed := ui.BoxStyle.Render(b.String())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
 }
-
