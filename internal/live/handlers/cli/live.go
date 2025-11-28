@@ -59,8 +59,5 @@ func (h *liveHandler) Handle(
 
 	fmt.Printf("✓ Found strategy: %s\n", selectedStrategy.Name)
 
-	// TODO: Load exchange config and execute
-	// This is where you'd validate credentials and start the strategy
-
 	return nil
 }

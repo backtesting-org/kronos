@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -68,7 +69,50 @@ func (s *liveService) FindConnectors() []settings.Connector {
 func (s *liveService) ValidateStrategy(strat *strategy.Strategy) error {
 	_, err := s.connectorService.GetConnectorConfigsForStrategy(strat.Exchanges)
 	if err != nil {
-		return fmt.Errorf("Missing connectors: %v\n\nPlease ensure these exchanges are:\n  • Configured in exchanges.yml\n  • Marked as enabled\n  • Available in the SDK", strat.Exchanges)
+		// Check if it's a StrategyValidationError so we can provide detailed feedback
+		var sve *connectors.StrategyValidationError
+		if errors.As(err, &sve) {
+			// Build a detailed error message from the specific problems
+			msg := fmt.Sprintf("Cannot start '%s' - missing or invalid connectors:\n\n", strat.Name)
+
+			notFound := sve.GetExchangesByProblem("not_found")
+			notEnabled := sve.GetExchangesByProblem("not_enabled")
+			missingCreds := sve.GetExchangesByProblem("missing_credentials")
+			invalidConfig := sve.GetExchangesByProblem("invalid_config")
+
+			if len(notFound) > 0 {
+				msg += fmt.Sprintf("❌ Not in SDK: %v\n   (Exchange connector not available)\n\n", notFound)
+			}
+			if len(notEnabled) > 0 {
+				msg += fmt.Sprintf("❌ Not enabled: %v\n   (Add to exchanges.yml and set enabled: true)\n\n", notEnabled)
+			}
+			if len(missingCreds) > 0 {
+				msg += fmt.Sprintf("❌ Missing credentials: %v\n", missingCreds)
+				for _, ex := range missingCreds {
+					if valErr := sve.GetExchangeError(ex); valErr != nil && len(valErr.Missing) > 0 {
+						msg += fmt.Sprintf("   • %s needs: %v\n", ex, valErr.Missing)
+					}
+				}
+				msg += "\n"
+			}
+			if len(invalidConfig) > 0 {
+				msg += fmt.Sprintf("❌ Invalid config: %v\n", invalidConfig)
+				for _, ex := range invalidConfig {
+					if valErr := sve.GetExchangeError(ex); valErr != nil {
+						if valErr.SDKValidationErr != "" {
+							msg += fmt.Sprintf("   • %s: %s\n", ex, valErr.SDKValidationErr)
+						}
+						for field, reason := range valErr.InvalidFields {
+							msg += fmt.Sprintf("   • %s.%s: %s\n", ex, field, reason)
+						}
+					}
+				}
+			}
+
+			return fmt.Errorf(msg)
+		}
+
+		return fmt.Errorf("failed to validate connectors: %w", err)
 	}
 	return nil
 }

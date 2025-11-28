@@ -62,25 +62,41 @@ func (c *connectorService) GetMatchingConnectors() (map[connector.ExchangeName]s
 
 // ValidateConnectorConfig validates if a specific exchange has the right configuration loaded
 func (c *connectorService) ValidateConnectorConfig(exchangeName connector.ExchangeName, userConnector settings.Connector) error {
-	// Check if the connector is available
+	ve := &ValidationError{
+		Exchange:      string(exchangeName),
+		Missing:       []string{},
+		InvalidFields: make(map[string]string),
+	}
+
+	// Check if the connector is available in SDK
 	if !connectors.IsAvailable(exchangeName) {
-		return fmt.Errorf("connector '%s' is not available", exchangeName)
+		ve.ExchangeNotFound = true
+		return ve
+	}
+
+	// Check if the connector is enabled
+	if !userConnector.Enabled {
+		ve.NotEnabled = true
+		return ve
 	}
 
 	// Check if the user connector name matches the exchange name
 	if userConnector.Name != string(exchangeName) {
-		return fmt.Errorf("connector name mismatch: expected '%s', got '%s'", exchangeName, userConnector.Name)
+		ve.InvalidFields["name"] = fmt.Sprintf("expected '%s', got '%s'", exchangeName, userConnector.Name)
+		return ve
 	}
 
 	// Map user connector to SDK config
 	sdkConfig, err := c.MapToSDKConfig(userConnector)
 	if err != nil {
-		return fmt.Errorf("failed to map connector config: %w", err)
+		ve.MappingError = err.Error()
+		return ve
 	}
 
 	// Validate the SDK config using the SDK's own validation logic
 	if err := sdkConfig.Validate(); err != nil {
-		return fmt.Errorf("invalid configuration for '%s': %w", exchangeName, err)
+		ve.SDKValidationErr = err.Error()
+		return ve
 	}
 
 	return nil
@@ -129,7 +145,7 @@ func (c *connectorService) MapToSDKConfig(userConnector settings.Connector) (loc
 }
 
 // GetConnectorConfigsForStrategy returns validated and mapped SDK configs for the given exchange names
-// This encapsulates all the logic of matching, filtering, validating, and mapping connectors
+// Returns a StrategyValidationError if there are problems so callers can inspect specific issues
 func (c *connectorService) GetConnectorConfigsForStrategy(exchangeNames []string) (map[connector.ExchangeName]localConnector.Config, error) {
 	// Get all matching connectors (available in SDK AND configured by user)
 	allConnectors, err := c.GetMatchingConnectors()
@@ -137,33 +153,80 @@ func (c *connectorService) GetConnectorConfigsForStrategy(exchangeNames []string
 		return nil, fmt.Errorf("failed to get connectors: %w", err)
 	}
 
+	// Track detailed problems for each exchange
+	validationResults := make(map[string]*ValidationError)
+
 	// Filter to only the exchanges this strategy needs and map to SDK configs
 	connectorConfigs := make(map[connector.ExchangeName]localConnector.Config)
 
 	for _, stratExchangeName := range exchangeNames {
 		exchangeName := connector.ExchangeName(stratExchangeName)
 
-		// Check if this exchange is in our matching connectors and enabled
+		// Check if this exchange exists in SDK
+		if !connectors.IsAvailable(exchangeName) {
+			ve := &ValidationError{
+				Exchange:         stratExchangeName,
+				ExchangeNotFound: true,
+			}
+			validationResults[stratExchangeName] = ve
+			continue
+		}
+
+		// Check if this exchange is configured by user
 		userConn, exists := allConnectors[exchangeName]
-		if !exists || !userConn.Enabled {
+		if !exists {
+			ve := &ValidationError{
+				Exchange:         stratExchangeName,
+				ExchangeNotFound: true,
+			}
+			validationResults[stratExchangeName] = ve
+			continue
+		}
+
+		// Check if enabled
+		if !userConn.Enabled {
+			ve := &ValidationError{
+				Exchange:   stratExchangeName,
+				NotEnabled: true,
+			}
+			validationResults[stratExchangeName] = ve
 			continue
 		}
 
 		// Validate and map to SDK config
 		if err := c.ValidateConnectorConfig(exchangeName, userConn); err != nil {
-			return nil, fmt.Errorf("invalid connector config for %s: %w", stratExchangeName, err)
+			// Store the validation error details
+			if valErr, ok := err.(*ValidationError); ok {
+				validationResults[stratExchangeName] = valErr
+			} else {
+				validationResults[stratExchangeName] = &ValidationError{
+					Exchange:         stratExchangeName,
+					SDKValidationErr: err.Error(),
+				}
+			}
+			continue
 		}
 
 		sdkConfig, err := c.MapToSDKConfig(userConn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to map connector config for %s: %w", stratExchangeName, err)
+			validationResults[stratExchangeName] = &ValidationError{
+				Exchange:     stratExchangeName,
+				MappingError: err.Error(),
+			}
+			continue
 		}
 
 		connectorConfigs[exchangeName] = sdkConfig
 	}
 
-	if len(connectorConfigs) == 0 {
-		return nil, fmt.Errorf("no enabled connectors found for exchanges: %v", exchangeNames)
+	// If we have any problems, return a detailed error
+	if len(validationResults) > 0 {
+		return nil, &StrategyValidationError{
+			Strategy:            "",
+			ExchangeNames:       exchangeNames,
+			SuccessfulExchanges: connectorConfigs,
+			ValidationErrors:    validationResults,
+		}
 	}
 
 	return connectorConfigs, nil
