@@ -67,8 +67,11 @@ func (c *settings) GetConnectors() ([]Connector, error) {
 
 // GetEnabledConnectors returns all enabled connectors
 func (c *settings) GetEnabledConnectors() ([]Connector, error) {
-	if c.settings != nil {
-		return c.settings.Connectors, nil
+	if c.settings == nil {
+		// Load the full config which will also cache settings
+		if _, err := c.LoadSettings(); err != nil {
+			return nil, err
+		}
 	}
 
 	enabled := make([]Connector, 0)
