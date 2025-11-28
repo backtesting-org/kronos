@@ -15,5 +15,6 @@ type LiveHandler interface {
 type LiveService interface {
 	FindStrategies() ([]strategy.Strategy, error)
 	FindConnectors() []settings.Connector
+	ValidateStrategy(strat *strategy.Strategy) error
 	ExecuteStrategy(ctx context.Context, strategy *strategy.Strategy, exchange *settings.Connector) error
 }

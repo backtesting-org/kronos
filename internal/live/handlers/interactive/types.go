@@ -2,6 +2,7 @@ package interactive
 
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
+	"github.com/backtesting-org/kronos-cli/internal/live/types"
 	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 )
 
@@ -29,4 +30,6 @@ type SelectionModel struct {
 	height        int
 	err           error
 	router        router.Router
+	service       types.LiveService // For pre-validation
+	validationErr string            // Validation error message to show in TUI
 }

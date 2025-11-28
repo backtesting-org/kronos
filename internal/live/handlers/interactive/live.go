@@ -38,7 +38,7 @@ func (l *live) Run() error {
 		return err
 	}
 
-	model := NewSelectionModel(strategies)
+	model := NewSelectionModel(strategies, l.service)
 	program := tea.NewProgram(model, tea.WithAltScreen())
 
 	finalModel, err := program.Run()
@@ -79,7 +79,7 @@ func (l *live) Run() error {
 }
 
 // NewSelectionModel creates a new strategy selection model (view only)
-func NewSelectionModel(strategies []strategy.Strategy) SelectionModel {
+func NewSelectionModel(strategies []strategy.Strategy, service types.LiveService) SelectionModel {
 	// If no strategies, start with empty state screen
 	initialScreen := ScreenSelection
 	if len(strategies) == 0 {
@@ -89,9 +89,10 @@ func NewSelectionModel(strategies []strategy.Strategy) SelectionModel {
 	return SelectionModel{
 		strategies:    strategies,
 		cursor:        0,
+		scrollOffset:  0,
+		selected:      nil,
 		currentScreen: initialScreen,
-		width:         80,
-		height:        24,
+		service:       service,
 	}
 }
 
@@ -153,6 +154,17 @@ func (m SelectionModel) updateEmptyState(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m SelectionModel) updateSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// If validation error is showing, handle specially
+	if m.validationErr != "" {
+		// Allow quit even with error showing
+		if msg.String() == "q" || msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		// Any other key clears the error
+		m.validationErr = ""
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -182,8 +194,17 @@ func (m SelectionModel) updateSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Select the current strategy and quit - service will handle execution
-		m.selected = &m.strategies[m.cursor]
+		// Validate connectors BEFORE quitting the TUI
+		selectedStrategy := &m.strategies[m.cursor]
+
+		if err := m.service.ValidateStrategy(selectedStrategy); err != nil {
+			// Validation failed - show error in TUI instead of quitting
+			m.validationErr = err.Error()
+			return m, nil
+		}
+
+		// Validation passed - select and quit
+		m.selected = selectedStrategy
 		return m, tea.Quit
 	}
 
@@ -341,6 +362,27 @@ func (m SelectionModel) renderSelection() string {
 
 	// Help text
 	help := ui.HelpStyle.Render("↑↓/jk Navigate  ↵ Select  q Quit")
+
+	// Show validation error if present
+	if m.validationErr != "" {
+		// Build a nice error box
+		errorLines := []string{
+			"",
+			ui.StatusErrorStyle.Render("⚠  Cannot Start Strategy"),
+			"",
+			ui.StrategyDescStyle.Render(m.validationErr),
+			"",
+			ui.HelpStyle.Render("Press any key to go back..."),
+			"",
+		}
+
+		errorContent := strings.Join(errorLines, "\n")
+		errorBox := ui.BoxStyle.Render(errorContent)
+
+		b.WriteString("\n\n")
+		b.WriteString(lipgloss.Place(m.width, 1, lipgloss.Center, lipgloss.Top, errorBox))
+		return b.String()
+	}
 
 	// Check if current strategy has error to show additional help
 	if m.cursor < len(m.strategies) && m.strategies[m.cursor].Status == strategy.StatusError {

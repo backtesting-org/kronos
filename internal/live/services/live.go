@@ -64,14 +64,32 @@ func (s *liveService) FindConnectors() []settings.Connector {
 	return setting.Connectors
 }
 
+// ValidateStrategy checks if the strategy can be executed (has valid connectors)
+func (s *liveService) ValidateStrategy(strat *strategy.Strategy) error {
+	_, err := s.connectorService.GetConnectorConfigsForStrategy(strat.Exchanges)
+	if err != nil {
+		return fmt.Errorf("Missing connectors: %v\n\nPlease ensure these exchanges are:\n  • Configured in exchanges.yml\n  • Marked as enabled\n  • Available in the SDK", strat.Exchanges)
+	}
+	return nil
+}
+
 // ExecuteStrategy runs the selected strategy with all its configured exchanges
 func (s *liveService) ExecuteStrategy(ctx context.Context, strat *strategy.Strategy, connector *settings.Connector) error {
-	// 1. Compile strategy if needed
+	// 1. Pre-validate that we have connectors for this strategy's exchanges
+	connectorConfigs, err := s.connectorService.GetConnectorConfigsForStrategy(strat.Exchanges)
+	if err != nil {
+		return fmt.Errorf("cannot start strategy '%s': %w\n\nPlease check:\n- exchanges.yml has entries for: %v\n- Required exchanges are enabled\n- Exchange connectors are available in the SDK",
+			strat.Name, err, strat.Exchanges)
+	}
+
+	s.logger.Info("Validated connector configs", "strategy", strat.Name, "connectors", len(connectorConfigs))
+
+	// 2. Compile strategy if needed
 	if err := s.compile.CompileStrategy(strat.Path); err != nil {
 		return fmt.Errorf("failed to compile strategy: %w", err)
 	}
 
-	// 2. Spawn kronos with run-strategy subcommand
+	// 3. Spawn kronos with run-strategy subcommand
 	args := []string{
 		"run-strategy",
 		"--strategy", strat.Name,
