@@ -7,9 +7,11 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/config"
 	"github.com/backtesting-org/kronos-cli/internal/handlers"
 	"github.com/backtesting-org/kronos-cli/internal/live"
+	"github.com/backtesting-org/kronos-cli/internal/live/runtime"
 	"github.com/backtesting-org/kronos-cli/internal/setup"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/backtesting-org/kronos-sdk/pkg/adapters"
 	"github.com/backtesting-org/live-trading/pkg"
 	"go.uber.org/fx"
 )
@@ -28,7 +30,13 @@ var Module = func() fx.Option {
 
 	// Only load runtime module when running run-strategy command
 	if len(os.Args) > 1 && os.Args[1] == "run-strategy" {
+		// pkg.Module includes everything: kronos SDK, adapters, logger, connectors, runtime
 		modules = append(modules, pkg.Module)
+		// Our runtime wrapper
+		modules = append(modules, runtime.Module)
+	} else {
+		// For regular CLI commands, just load adapters for logger
+		modules = append(modules, adapters.Module)
 	}
 
 	return fx.Options(modules...)

@@ -10,6 +10,5 @@ var Module = fx.Module("shared",
 	fx.Provide(
 		NewCompileService,
 		NewStrategyDiscovery,
-		NewApplicationLogger,
 	),
 )
