@@ -1,6 +1,8 @@
 package services
 
-import "github.com/backtesting-org/kronos-cli/internal/backtesting/types"
+import (
+	"github.com/backtesting-org/kronos-cli/internal/strategies/backtest/types"
+)
 
 // analyzeService handles result analysis
 type analyzeService struct{}

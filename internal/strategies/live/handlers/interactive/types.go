@@ -2,7 +2,7 @@ package interactive
 
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/live/types"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
 	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 )
 

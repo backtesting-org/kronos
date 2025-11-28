@@ -1,9 +1,10 @@
 package handlers
 
 import (
-	backtesting "github.com/backtesting-org/kronos-cli/internal/backtesting/types"
-	liveTypes "github.com/backtesting-org/kronos-cli/internal/live/types"
 	setup "github.com/backtesting-org/kronos-cli/internal/setup/types"
+	backtesting "github.com/backtesting-org/kronos-cli/internal/strategies/backtest/types"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/browse/handlers"
+	liveTypes "github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
@@ -14,6 +15,7 @@ type RootHandler interface {
 
 // RootHandler handles the root command and main menu
 type rootHandler struct {
+	strategyBrowser handlers.StrategyBrowser
 	initHandler     setup.InitHandler
 	liveHandler     liveTypes.LiveHandler
 	backtestHandler backtesting.BacktestHandler
@@ -21,12 +23,14 @@ type rootHandler struct {
 }
 
 func NewRootHandler(
+	strategyBrowser handlers.StrategyBrowser,
 	initHandler setup.InitHandler,
 	liveHandler liveTypes.LiveHandler,
 	backtestHandler backtesting.BacktestHandler,
 	analyzeHandler backtesting.AnalyzeHandler,
 ) RootHandler {
 	return &rootHandler{
+		strategyBrowser: strategyBrowser,
 		initHandler:     initHandler,
 		liveHandler:     liveHandler,
 		backtestHandler: backtestHandler,
@@ -67,7 +71,7 @@ func (h *rootHandler) runMainMenu(rootCmd *cobra.Command) error {
 
 	switch result.selected {
 	case "Strategies":
-		return h.liveHandler.Handle(rootCmd, []string{})
+		return h.strategyBrowser.Handle(rootCmd, []string{})
 	case "Settings":
 		return h.handleSettings(rootCmd)
 	case "Help":

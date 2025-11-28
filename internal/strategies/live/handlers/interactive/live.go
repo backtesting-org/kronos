@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/live/types"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 	tea "github.com/charmbracelet/bubbletea"
