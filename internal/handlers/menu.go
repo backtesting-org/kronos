@@ -72,7 +72,7 @@ func (m mainMenuModel) View() string {
 	s += "\n" + title + "\n\n"
 	s += mutedStyle.Render("What would you like to do?") + "\n\n"
 
-	icons := []string{"🚀", "📊", "📈", "🆕", "ℹ️"}
+	icons := []string{"📂", "⚙️", "ℹ️", "🆕"}
 
 	for i, choice := range m.choices {
 		cursor := "  "
