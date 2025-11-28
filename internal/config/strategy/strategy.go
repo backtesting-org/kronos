@@ -101,6 +101,8 @@ func (c *strategyConfig) FindStrategies() ([]Strategy, error) {
 			cfg.Status = StatusError
 		}
 
+		cfg.Path = strategyPath
+
 		strategies = append(strategies, *cfg)
 	}
 
