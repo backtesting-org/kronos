@@ -2,11 +2,11 @@ package connectors
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/settings"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
-	localConnector "github.com/backtesting-org/live-trading/pkg/connector"
 	"github.com/backtesting-org/live-trading/pkg/connectors"
 )
 
@@ -14,8 +14,8 @@ type ConnectorService interface {
 	FetchAvailableConnectors() []connector.ExchangeName
 	GetMatchingConnectors() (map[connector.ExchangeName]settings.Connector, error)
 	ValidateConnectorConfig(exchangeName connector.ExchangeName, userConnector settings.Connector) error
-	MapToSDKConfig(userConnector settings.Connector) (localConnector.Config, error)
-	GetConnectorConfigsForStrategy(exchangeNames []string) (map[connector.ExchangeName]localConnector.Config, error)
+	MapToSDKConfig(userConnector settings.Connector) (connector.Config, error)
+	GetConnectorConfigsForStrategy(exchangeNames []string) (map[connector.ExchangeName]connector.Config, error)
 }
 
 type connectorService struct {
@@ -46,12 +46,15 @@ func (c *connectorService) GetMatchingConnectors() (map[connector.ExchangeName]s
 	// Get user's configured connectors from the settings service
 	userConnectors, err := c.config.GetConnectors()
 	if err != nil {
+		fmt.Println("Error fetching user connectors:", err)
 		return nil, err
 	}
 
 	// Filter to only return matching connectors as a map
 	matchingConnectors := make(map[connector.ExchangeName]settings.Connector)
 	for _, conn := range userConnectors {
+		fmt.Println("Checking connector:", conn.Name)
+		fmt.Println("Available connectors:", availableMap)
 		if availableMap[conn.Name] {
 			matchingConnectors[connector.ExchangeName(conn.Name)] = conn
 		}
@@ -104,7 +107,7 @@ func (c *connectorService) ValidateConnectorConfig(exchangeName connector.Exchan
 
 // MapToSDKConfig maps a user connector configuration to the appropriate SDK config type
 // This uses the SDK's config templates and generically maps the user's credentials
-func (c *connectorService) MapToSDKConfig(userConnector settings.Connector) (localConnector.Config, error) {
+func (c *connectorService) MapToSDKConfig(userConnector settings.Connector) (connector.Config, error) {
 	exchangeName := connector.ExchangeName(userConnector.Name)
 
 	// Get the config type template for this exchange from the SDK
@@ -146,8 +149,8 @@ func (c *connectorService) MapToSDKConfig(userConnector settings.Connector) (loc
 
 // GetConnectorConfigsForStrategy returns validated and mapped SDK configs for the given exchange names
 // Returns a StrategyValidationError if there are problems so callers can inspect specific issues
-func (c *connectorService) GetConnectorConfigsForStrategy(exchangeNames []string) (map[connector.ExchangeName]localConnector.Config, error) {
-	// Get all matching connectors (available in SDK AND configured by user)
+func (c *connectorService) GetConnectorConfigsForStrategy(exchangeNames []string) (map[connector.ExchangeName]connector.Config, error) {
+	// Get all matching connectors
 	allConnectors, err := c.GetMatchingConnectors()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connectors: %w", err)
@@ -157,7 +160,7 @@ func (c *connectorService) GetConnectorConfigsForStrategy(exchangeNames []string
 	validationResults := make(map[string]*ValidationError)
 
 	// Filter to only the exchanges this strategy needs and map to SDK configs
-	connectorConfigs := make(map[connector.ExchangeName]localConnector.Config)
+	connectorConfigs := make(map[connector.ExchangeName]connector.Config)
 
 	for _, stratExchangeName := range exchangeNames {
 		exchangeName := connector.ExchangeName(stratExchangeName)
@@ -196,13 +199,9 @@ func (c *connectorService) GetConnectorConfigsForStrategy(exchangeNames []string
 		// Validate and map to SDK config
 		if err := c.ValidateConnectorConfig(exchangeName, userConn); err != nil {
 			// Store the validation error details
-			if valErr, ok := err.(*ValidationError); ok {
+			var valErr *ValidationError
+			if errors.As(err, &valErr) {
 				validationResults[stratExchangeName] = valErr
-			} else {
-				validationResults[stratExchangeName] = &ValidationError{
-					Exchange:         stratExchangeName,
-					SDKValidationErr: err.Error(),
-				}
 			}
 			continue
 		}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
-	localConnector "github.com/backtesting-org/live-trading/pkg/connector"
 )
 
 // ValidationError provides detailed information about what went wrong during connector validation
@@ -73,19 +72,19 @@ func (ve *ValidationError) IsInvalidConfig() bool {
 
 // StrategyValidationError contains validation results for all exchanges in a strategy
 type StrategyValidationError struct {
-	Strategy            string                                           // Strategy name
-	ExchangeNames       []string                                         // Requested exchanges
-	SuccessfulExchanges map[connector.ExchangeName]localConnector.Config // Exchanges that loaded successfully
-	ValidationErrors    map[string]*ValidationError                      // Exchange name -> validation error
+	Strategy            string                                      // Strategy name
+	ExchangeNames       []string                                    // Requested exchanges
+	SuccessfulExchanges map[connector.ExchangeName]connector.Config // Exchanges that loaded successfully
+	ValidationErrors    map[string]*ValidationError                 // Exchange name -> validation error
 }
 
 // Error implements the error interface
 func (sve *StrategyValidationError) Error() string {
-	msg := fmt.Sprintf("strategy validation failed for exchanges: %v\n\n", sve.ExchangeNames)
-
 	if len(sve.ValidationErrors) == 0 {
-		return msg + "all exchanges validated successfully"
+		return "all exchanges validated successfully"
 	}
+
+	msg := fmt.Sprintf("strategy validation failed for exchanges: %v\n\n", sve.ExchangeNames)
 
 	msg += fmt.Sprintf("Failed exchanges: %d/%d\n\n", len(sve.ValidationErrors), len(sve.ExchangeNames))
 
