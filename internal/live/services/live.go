@@ -71,43 +71,25 @@ func (s *liveService) ExecuteStrategy(ctx context.Context, strat *strategy.Strat
 		return fmt.Errorf("failed to compile strategy: %w", err)
 	}
 
-	// 2. Build a new kronos-live binary for this strategy instance
-	kronosLivePath := fmt.Sprintf("%s/kronos-live-%s", strat.Path, strat.Name)
-
-	s.logger.Info("Building kronos-live binary for strategy", "output", kronosLivePath)
-
-	buildCmd := exec.Command("go", "build",
-		"-o", kronosLivePath,
-		"./cmd/kronos-live",
-	)
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
-
-	if err := buildCmd.Run(); err != nil {
-		return fmt.Errorf("failed to build kronos-live binary: %w", err)
-	}
-
-	// 3. Build command - just pass the strategy directory
+	// 2. Spawn kronos with run-strategy subcommand
 	args := []string{
-		"run",
-		"--strategy-dir", strat.Path,
+		"run-strategy",
+		"--strategy", strat.Name,
 	}
 
 	if strat.Execution.DryRun {
 		args = append(args, "--dry-run")
 	}
 
-	// 4. Execute the new binary instance
-	cmd := exec.Command(kronosLivePath, args...)
+	cmd := exec.Command("kronos", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
 
-	s.logger.Info("Starting live trading instance",
+	s.logger.Info("Spawning strategy instance",
 		"strategy", strat.Name,
 		"exchanges", strat.Exchanges,
-		"binary", kronosLivePath,
 	)
 
-	return cmd.Run()
+	// Start in background - don't wait for it to finish
+	return cmd.Start()
 }
