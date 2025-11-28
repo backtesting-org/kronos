@@ -1,24 +1,23 @@
 package app
 
 import (
+	"github.com/backtesting-org/kronos-cli/internal/backtesting"
+	"github.com/backtesting-org/kronos-cli/internal/config"
 	"github.com/backtesting-org/kronos-cli/internal/handlers"
-	"github.com/backtesting-org/kronos-cli/internal/services"
+	"github.com/backtesting-org/kronos-cli/internal/live"
+	"github.com/backtesting-org/kronos-cli/internal/setup"
+	"github.com/backtesting-org/kronos-cli/internal/shared"
+	"github.com/backtesting-org/kronos-cli/internal/ui"
 	"go.uber.org/fx"
 )
 
-// Module provides all application dependencies
+// Module provides all application dependencies by composing domain modules
 var Module = fx.Options(
-	// Services
-	fx.Provide(services.NewScaffoldService),
-	fx.Provide(services.NewLiveService),
-	fx.Provide(services.NewBacktestService),
-	fx.Provide(services.NewAnalyzeService),
-	fx.Provide(services.NewCompileService),
-
-	// Handlers
-	fx.Provide(handlers.NewInitHandler),
-	fx.Provide(handlers.NewLiveHandler),
-	fx.Provide(handlers.NewBacktestHandler),
-	fx.Provide(handlers.NewAnalyzeHandler),
-	fx.Provide(handlers.NewRootHandler),
+	backtesting.Module,
+	setup.Module,
+	shared.Module,
+	handlers.Module,
+	config.Module,
+	ui.Module,
+	live.Module,
 )

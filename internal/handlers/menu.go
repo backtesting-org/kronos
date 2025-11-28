@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	handlers2 "github.com/backtesting-org/kronos-cli/internal/setup/handlers"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -88,9 +89,9 @@ func (m mainMenuModel) View() string {
 	return boxStyle.Render(s)
 }
 
-func (h *RootHandler) handleCreateProject(cmd *cobra.Command) error {
+func (h *rootHandler) handleCreateProject(cmd *cobra.Command) error {
 	// Run the init TUI flow
-	strategyExample, projectName, err := RunInitTUI()
+	strategyExample, projectName, err := handlers2.RunInitTUI()
 	if err != nil {
 		return err
 	}

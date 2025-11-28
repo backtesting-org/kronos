@@ -1,25 +1,32 @@
 package handlers
 
 import (
+	backtesting "github.com/backtesting-org/kronos-cli/internal/backtesting/types"
+	liveTypes "github.com/backtesting-org/kronos-cli/internal/live/types"
+	setup "github.com/backtesting-org/kronos-cli/internal/setup/types"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
+type RootHandler interface {
+	Handle(cmd *cobra.Command, args []string) error
+}
+
 // RootHandler handles the root command and main menu
-type RootHandler struct {
-	initHandler     *InitHandler
-	liveHandler     *LiveHandler
-	backtestHandler *BacktestHandler
-	analyzeHandler  *AnalyzeHandler
+type rootHandler struct {
+	initHandler     setup.InitHandler
+	liveHandler     liveTypes.LiveHandler
+	backtestHandler backtesting.BacktestHandler
+	analyzeHandler  backtesting.AnalyzeHandler
 }
 
 func NewRootHandler(
-	initHandler *InitHandler,
-	liveHandler *LiveHandler,
-	backtestHandler *BacktestHandler,
-	analyzeHandler *AnalyzeHandler,
-) *RootHandler {
-	return &RootHandler{
+	initHandler setup.InitHandler,
+	liveHandler liveTypes.LiveHandler,
+	backtestHandler backtesting.BacktestHandler,
+	analyzeHandler backtesting.AnalyzeHandler,
+) RootHandler {
+	return &rootHandler{
 		initHandler:     initHandler,
 		liveHandler:     liveHandler,
 		backtestHandler: backtestHandler,
@@ -27,17 +34,17 @@ func NewRootHandler(
 	}
 }
 
-func (h *RootHandler) Handle(cmd *cobra.Command, args []string) error {
-	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
+func (h *rootHandler) Handle(cmd *cobra.Command, args []string) error {
+	cliMode, _ := cmd.Flags().GetBool("cli")
 
-	if nonInteractive || len(args) > 0 {
+	if cliMode || len(args) > 0 {
 		return cmd.Help()
 	}
 
 	return h.runMainMenu(cmd)
 }
 
-func (h *RootHandler) runMainMenu(rootCmd *cobra.Command) error {
+func (h *rootHandler) runMainMenu(rootCmd *cobra.Command) error {
 	m := mainMenuModel{
 		choices: []string{
 			"Start Live Trading",
