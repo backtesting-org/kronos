@@ -12,9 +12,10 @@ import (
 
 type ConnectorService interface {
 	FetchAvailableConnectors() []connector.ExchangeName
-	GetMatchingConnectors() ([]settings.Connector, error)
+	GetMatchingConnectors() (map[connector.ExchangeName]settings.Connector, error)
 	ValidateConnectorConfig(exchangeName connector.ExchangeName, userConnector settings.Connector) error
 	MapToSDKConfig(userConnector settings.Connector) (localConnector.Config, error)
+	GetConnectorConfigsForStrategy(exchangeNames []string) (map[connector.ExchangeName]localConnector.Config, error)
 }
 
 type connectorService struct {
@@ -32,14 +33,14 @@ func (c *connectorService) FetchAvailableConnectors() []connector.ExchangeName {
 }
 
 // GetMatchingConnectors returns user-configured connectors that are also available in the SDK
-func (c *connectorService) GetMatchingConnectors() ([]settings.Connector, error) {
+func (c *connectorService) GetMatchingConnectors() (map[connector.ExchangeName]settings.Connector, error) {
 	// Get available connectors from SDK
 	availableConnectors := c.FetchAvailableConnectors()
 
-	// Create a map for quick lookup
+	// Create a lookup map for quick checking
 	availableMap := make(map[string]bool)
-	for _, connectorName := range availableConnectors {
-		availableMap[string(connectorName)] = true
+	for _, exchangeName := range availableConnectors {
+		availableMap[string(exchangeName)] = true
 	}
 
 	// Get user's configured connectors from the settings service
@@ -48,11 +49,11 @@ func (c *connectorService) GetMatchingConnectors() ([]settings.Connector, error)
 		return nil, err
 	}
 
-	// Filter to only return matching connectors
-	matchingConnectors := make([]settings.Connector, 0)
+	// Filter to only return matching connectors as a map
+	matchingConnectors := make(map[connector.ExchangeName]settings.Connector)
 	for _, conn := range userConnectors {
 		if availableMap[conn.Name] {
-			matchingConnectors = append(matchingConnectors, conn)
+			matchingConnectors[connector.ExchangeName(conn.Name)] = conn
 		}
 	}
 
@@ -125,4 +126,45 @@ func (c *connectorService) MapToSDKConfig(userConnector settings.Connector) (loc
 	}
 
 	return sdkConfig, nil
+}
+
+// GetConnectorConfigsForStrategy returns validated and mapped SDK configs for the given exchange names
+// This encapsulates all the logic of matching, filtering, validating, and mapping connectors
+func (c *connectorService) GetConnectorConfigsForStrategy(exchangeNames []string) (map[connector.ExchangeName]localConnector.Config, error) {
+	// Get all matching connectors (available in SDK AND configured by user)
+	allConnectors, err := c.GetMatchingConnectors()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connectors: %w", err)
+	}
+
+	// Filter to only the exchanges this strategy needs and map to SDK configs
+	connectorConfigs := make(map[connector.ExchangeName]localConnector.Config)
+
+	for _, stratExchangeName := range exchangeNames {
+		exchangeName := connector.ExchangeName(stratExchangeName)
+
+		// Check if this exchange is in our matching connectors and enabled
+		userConn, exists := allConnectors[exchangeName]
+		if !exists || !userConn.Enabled {
+			continue
+		}
+
+		// Validate and map to SDK config
+		if err := c.ValidateConnectorConfig(exchangeName, userConn); err != nil {
+			return nil, fmt.Errorf("invalid connector config for %s: %w", stratExchangeName, err)
+		}
+
+		sdkConfig, err := c.MapToSDKConfig(userConn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to map connector config for %s: %w", stratExchangeName, err)
+		}
+
+		connectorConfigs[exchangeName] = sdkConfig
+	}
+
+	if len(connectorConfigs) == 0 {
+		return nil, fmt.Errorf("no enabled connectors found for exchanges: %v", exchangeNames)
+	}
+
+	return connectorConfigs, nil
 }

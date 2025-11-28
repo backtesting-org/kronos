@@ -5,7 +5,6 @@ import (
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/live/types"
-	"github.com/backtesting-org/live-trading/pkg/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +14,6 @@ type CLILiveHandler interface {
 
 // liveHandler handles the live command in CLI mode
 type liveHandler struct {
-	runtime        runtime.Runtime
 	strategyConfig strategy.StrategyConfig
 	liveService    types.LiveService
 }
@@ -23,12 +21,10 @@ type liveHandler struct {
 func NewCLILiveHandler(
 	liveService types.LiveService,
 	strategyConfig strategy.StrategyConfig,
-	runtime runtime.Runtime,
 ) CLILiveHandler {
 	return &liveHandler{
 		liveService:    liveService,
 		strategyConfig: strategyConfig,
-		runtime:        runtime,
 	}
 }
 

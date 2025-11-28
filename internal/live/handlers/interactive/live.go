@@ -296,12 +296,24 @@ func (m SelectionModel) renderSelection() string {
 
 		description := ui.StrategyDescStyle.Render(strat.Description)
 
+		// Build exchanges info
+		var exchangesInfo string
+		if len(strat.Exchanges) > 0 {
+			exchangeNames := strings.Join(strat.Exchanges, ", ")
+			exchangesInfo = ui.StrategyMetaStyle.Render(fmt.Sprintf("Exchanges: %s", exchangeNames))
+		}
+
 		itemContent := fmt.Sprintf(
 			"%s  %s\n%s",
 			statusIndicator,
 			name,
 			description,
 		)
+
+		// Add exchanges info
+		if exchangesInfo != "" {
+			itemContent += "\n" + exchangesInfo
+		}
 
 		// Add error message if strategy has an error and is selected
 		if strat.Status == strategy.StatusError && strat.Error != "" && m.cursor == i {

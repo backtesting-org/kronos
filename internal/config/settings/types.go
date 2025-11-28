@@ -19,7 +19,7 @@ type Connector struct {
 	Enabled     bool              `yaml:"enabled"`
 	Network     string            `yaml:"network,omitempty"`
 	Assets      []string          `yaml:"assets"`
-	Credentials map[string]string `yaml:"credentials,omitempty"`
+	Credentials map[string]string `yaml:"credentials"`
 }
 
 // BacktestConfig holds backtest settings

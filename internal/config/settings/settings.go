@@ -89,34 +89,3 @@ func (c *settings) fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
-
-// DefaultConfig returns a default settings
-//func DefaultConfig() *config.Config {
-//	return &config.Config{
-//		Version: "1.0",
-//		Backtest: config.BacktestConfig{
-//			Strategy: "market_making",
-//			Exchange: "binance",
-//			Pair:     "BTC/USDT",
-//			Timeframe: config.TimeframeConfig{
-//				Start: "2024-01-01",
-//				End:   "2024-06-30",
-//			},
-//			Parameters: map[string]interface{}{
-//				"bid_spread":      0.1,
-//				"ask_spread":      0.1,
-//				"order_size":      1.0,
-//				"inventory_limit": 5.0,
-//			},
-//			Execution: config.ExecutionConfig{},
-//			Output: config.OutputConfig{
-//				Format:      "text",
-//				SaveResults: true,
-//				ResultsDir:  "./results",
-//			},
-//		},
-//		Live: config.LiveConfig{
-//			Enabled: false,
-//		},
-//	}
-//}
