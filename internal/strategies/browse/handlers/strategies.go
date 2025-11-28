@@ -4,8 +4,9 @@ import (
 	"fmt"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
+	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -16,11 +17,13 @@ type StrategyBrowser interface {
 
 type strategyBrowser struct {
 	strategyService strategy.StrategyConfig
+	router          router.Router
 }
 
-func NewStrategyBrowser(strategyService strategy.StrategyConfig) StrategyBrowser {
+func NewStrategyBrowser(strategyService strategy.StrategyConfig, r router.Router) StrategyBrowser {
 	return &strategyBrowser{
 		strategyService: strategyService,
+		router:          r,
 	}
 }
 
@@ -35,8 +38,8 @@ func (h *strategyBrowser) Handle(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("no strategies found")
 	}
 
-	// Create and run the strategy list model
-	m := newStrategyListModel(strategies)
+	// Create and run the orchestrator model
+	m := newStrategiesModel(strategies, h.router)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	finalModel, err := p.Run()
@@ -44,31 +47,93 @@ func (h *strategyBrowser) Handle(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	result := finalModel.(strategyListModel)
+	result := finalModel.(strategiesModel)
 	if result.err != nil {
 		return result.err
 	}
 
-	// TODO: When strategy is selected, show action menu
 	return nil
+}
+
+// strategiesModel is the top-level model that orchestrates navigation
+type strategiesModel struct {
+	list   strategyListModel
+	detail strategyActionsModel
+	screen string // "list" or "detail"
+	router router.Router
+	err    error
+}
+
+func newStrategiesModel(strategies []strategy.Strategy, r router.Router) strategiesModel {
+	return strategiesModel{
+		list:   strategyListModel{strategies: strategies, cursor: 0, pageSize: 10, pageNum: 1},
+		screen: "list",
+		router: r,
+	}
+}
+
+func (m strategiesModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m strategiesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case router.NavigateMsg:
+		// Handle navigation messages
+		switch msg.Route {
+		case router.RouteMenu:
+			return m, tea.Quit
+		}
+	}
+
+	// Route to current screen's update
+	if m.screen == "list" {
+		updated, cmd := m.list.Update(msg)
+		if listModel, ok := updated.(strategyListModel); ok {
+			m.list = listModel
+
+			// Check if transitioned to detail screen
+			if listModel.transitionToDetail {
+				m.detail = newStrategyActionsModel(&listModel.strategies[listModel.cursor])
+				m.screen = "detail"
+				m.list.transitionToDetail = false
+			}
+		}
+		return m, cmd
+	} else if m.screen == "detail" {
+		updated, cmd := m.detail.Update(msg)
+		if detailModel, ok := updated.(strategyActionsModel); ok {
+			m.detail = detailModel
+
+			// Check if going back to list
+			if detailModel.backToList {
+				m.screen = "list"
+				m.detail.backToList = false
+			}
+		}
+		return m, cmd
+	}
+
+	return m, nil
+}
+
+func (m strategiesModel) View() string {
+	if m.screen == "list" {
+		return m.list.View()
+	} else if m.screen == "detail" {
+		return m.detail.View()
+	}
+	return ""
 }
 
 // strategyListModel represents the strategy list view (STRATEGIES screen)
 type strategyListModel struct {
-	strategies []strategy.Strategy
-	cursor     int
-	pageSize   int
-	pageNum    int
-	err        error
-}
-
-func newStrategyListModel(strategies []strategy.Strategy) strategyListModel {
-	return strategyListModel{
-		strategies: strategies,
-		cursor:     0,
-		pageSize:   10,
-		pageNum:    1,
-	}
+	strategies         []strategy.Strategy
+	cursor             int
+	pageSize           int
+	pageNum            int
+	transitionToDetail bool
+	err                error
 }
 
 func (m strategyListModel) Init() tea.Cmd {
@@ -90,81 +155,54 @@ func (m strategyListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter":
-			// Transition to strategy actions screen
-			selectedStrategy := m.strategies[m.cursor]
-			actionsModel := newStrategyActionsModel(&selectedStrategy)
-			return actionsModel, nil
+			// Mark transition to detail screen
+			m.transitionToDetail = true
 		}
 	}
 	return m, nil
 }
 
 func (m strategyListModel) View() string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#00D9FF")).
-		PaddingTop(1).
-		PaddingBottom(1).
-		Align(lipgloss.Center)
-
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#7C3AED")).
-		Padding(1, 2).
-		Width(70)
-
-	itemStyle := lipgloss.NewStyle().
-		PaddingLeft(2)
-
-	selectedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#00D9FF")).
-		Bold(true).
-		PaddingLeft(0)
-
-	mutedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		Italic(true)
-
-	title := titleStyle.Render("STRATEGIES")
-
 	if len(m.strategies) == 0 {
-		return title + "\n\n" + mutedStyle.Render("No strategies found. Create a new one to get started.")
+		return ui.TitleStyle.Render("STRATEGIES") + "\n\n" + ui.SubtitleStyle.Render("No strategies found. Create a new one to get started.")
 	}
 
 	var content string
-	content += title + "\n\n"
-	content += mutedStyle.Render("Use arrow keys to navigate, Enter to select, q to quit") + "\n\n"
+	content += ui.TitleStyle.Render("STRATEGIES") + "\n"
+	content += ui.SubtitleStyle.Render("Use arrow keys to navigate, Enter to select, q to quit") + "\n\n"
 
 	// Display current page
 	for i, strat := range m.strategies {
-		exchanges := fmt.Sprintf("[%s]", fmt.Sprintf("%v", strat.Exchanges))
+		exchanges := fmt.Sprintf("[%v]", strat.Exchanges)
 		if i == m.cursor {
-			content += selectedStyle.Render("▶ "+strat.Name+" "+exchanges) + "\n"
+			content += ui.StrategyNameSelectedStyle.Render("▶ "+strat.Name+" "+exchanges) + "\n"
 		} else {
-			content += itemStyle.Render("  "+strat.Name+" "+exchanges) + "\n"
+			content += ui.StrategyNameStyle.Render("  "+strat.Name+" "+exchanges) + "\n"
 		}
 	}
 
 	// Show pagination info
 	totalPages := (len(m.strategies) + m.pageSize - 1) / m.pageSize
-	content += "\n" + mutedStyle.Render(fmt.Sprintf("Page %d/%d", m.pageNum, totalPages))
+	content += "\n" + ui.SubtitleStyle.Render(fmt.Sprintf("Page %d/%d", m.pageNum, totalPages))
 
-	return boxStyle.Render(content)
+	return ui.BoxStyle.Render(content)
 }
 
 // strategyActionsModel represents the strategy detail view with action options (STRATEGY screen)
 type strategyActionsModel struct {
-	strategy *strategy.Strategy
-	actions  []string
-	cursor   int
-	err      error
+	strategy   *strategy.Strategy
+	actions    []string
+	cursor     int
+	backToList bool
+	err        error
 }
 
 func newStrategyActionsModel(strat *strategy.Strategy) strategyActionsModel {
 	return strategyActionsModel{
-		strategy: strat,
-		actions:  []string{"Compile", "Backtest", "Edit", "Delete"},
-		cursor:   0,
+		strategy:   strat,
+		actions:    []string{"Compile", "Backtest", "Edit", "Delete"},
+		cursor:     0,
+		backToList: false,
 	}
 }
 
@@ -179,8 +217,8 @@ func (m strategyActionsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "q":
-			// Go back to list
-			return m, tea.Quit
+			// Mark to go back to list
+			m.backToList = true
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -198,56 +236,31 @@ func (m strategyActionsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m strategyActionsModel) View() string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#00D9FF")).
-		PaddingTop(1).
-		PaddingBottom(1)
-
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#7C3AED")).
-		Padding(1, 2).
-		Width(70)
-
-	selectedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#00D9FF")).
-		Bold(true)
-
-	mutedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		Italic(true)
-
-	infoStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#D1D5DB"))
-
-	title := titleStyle.Render(m.strategy.Name)
-
 	var content string
-	content += title + "\n\n"
+	content += ui.TitleStyle.Render(m.strategy.Name) + "\n"
 
 	// Display strategy metadata
 	if m.strategy.Description != "" {
-		content += infoStyle.Render("📝 "+m.strategy.Description) + "\n"
+		content += ui.StrategyDescStyle.Render("📝 "+m.strategy.Description) + "\n"
 	}
 
-	content += infoStyle.Render(fmt.Sprintf("🔗 Exchanges: %v", m.strategy.Exchanges)) + "\n"
+	content += ui.StrategyMetaStyle.Render(fmt.Sprintf("🔗 Exchanges: %v", m.strategy.Exchanges)) + "\n"
 
 	if len(m.strategy.Parameters) > 0 {
-		content += infoStyle.Render(fmt.Sprintf("⚙️  Parameters: %d", len(m.strategy.Parameters))) + "\n"
+		content += ui.StrategyMetaStyle.Render(fmt.Sprintf("⚙️  Parameters: %d", len(m.strategy.Parameters))) + "\n"
 	}
 
-	content += "\n" + mutedStyle.Render("Select action:") + "\n\n"
+	content += "\n" + ui.SubtitleStyle.Render("Select action:") + "\n\n"
 
 	for i, action := range m.actions {
 		if i == m.cursor {
-			content += selectedStyle.Render("▶ "+action) + "\n"
+			content += ui.StrategyNameSelectedStyle.Render("▶ "+action) + "\n"
 		} else {
 			content += "  " + action + "\n"
 		}
 	}
 
-	content += "\n" + mutedStyle.Render("Enter to select, q to back, ctrl+c to quit")
+	content += "\n" + ui.SubtitleStyle.Render("Enter to select, q to back, ctrl+c to quit")
 
-	return boxStyle.Render(content)
+	return ui.BoxStyle.Render(content)
 }
