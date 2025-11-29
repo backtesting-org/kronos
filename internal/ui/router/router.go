@@ -2,6 +2,7 @@ package router
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/donderom/bubblon"
 )
 
 // Route represents a navigation destination
@@ -21,96 +22,59 @@ const (
 	RouteStrategyDelete   Route = "strategy-delete"
 )
 
-// NavigateMsg is sent when navigating to a new route
-type NavigateMsg struct {
-	Route Route
-	Data  interface{}
-	View  tea.Model // The view is created externally with its dependencies
-}
-
-// Router is the main Tea model that manages view navigation
-// It does NOT create views or store services
+// Router is the main Tea model that manages view navigation using Bubblon's Controller
+// It delegates all navigation through Bubblon's Open/Close/Replace commands
 type Router interface {
 	tea.Model
 
 	// SetInitialView sets the starting view
 	SetInitialView(view tea.Model)
-
-	// Navigate creates a navigation message
-	Navigate(route Route) tea.Cmd
-
-	// NavigateWithData creates a navigation message with context
-	NavigateWithData(route Route, data interface{}) tea.Cmd
 }
 
 type router struct {
-	currentRoute Route
-	currentView  tea.Model
+	controller bubblon.Controller
 }
 
-// NewRouter creates a simple router - no services, no factories
-func NewRouter() Router {
-	return &router{
-		currentRoute: RouteStrategyList,
+// NewRouter creates an empty router ready to have views pushed
+func NewRouter() (Router, error) {
+	// Create an empty controller with a dummy model initially
+	// This will be replaced when SetInitialView is called
+	dummyModel := &dummyModel{}
+	ctrl, err := bubblon.New(dummyModel)
+	if err != nil {
+		return nil, err
 	}
+	return &router{
+		controller: ctrl,
+	}, nil
 }
 
-// SetInitialView sets the starting view
+// dummyModel is a placeholder for when router hasn't been initialized with a real view yet
+type dummyModel struct{}
+
+func (d *dummyModel) Init() tea.Cmd                           { return nil }
+func (d *dummyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return d, nil }
+func (d *dummyModel) View() string                            { return "" }
+
+// SetInitialView sets the starting view (call before running the program)
 func (r *router) SetInitialView(view tea.Model) {
-	r.currentView = view
+	r.controller, _ = bubblon.New(view)
 }
 
 // Init implements tea.Model
 func (r *router) Init() tea.Cmd {
-	if r.currentView != nil {
-		return r.currentView.Init()
-	}
-	return nil
+	return r.controller.Init()
 }
 
 // Update implements tea.Model
+// Bubblon handles all navigation commands (Open/Close/Replace) internally
 func (r *router) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Handle navigation messages
-	if navMsg, ok := msg.(NavigateMsg); ok {
-		// Navigation message contains the new view already created with its dependencies
-		if navMsg.View != nil {
-			r.currentRoute = navMsg.Route
-			r.currentView = navMsg.View
-			return r, r.currentView.Init()
-		}
-	}
-
-	// Pass other messages to current view
-	if r.currentView == nil {
-		return r, nil
-	}
-
-	updated, cmd := r.currentView.Update(msg)
-	r.currentView = updated
+	updated, cmd := r.controller.Update(msg)
+	r.controller = updated.(bubblon.Controller)
 	return r, cmd
 }
 
 // View implements tea.Model
 func (r *router) View() string {
-	if r.currentView == nil {
-		return ""
-	}
-	return r.currentView.View()
-}
-
-// Navigate creates a navigation command
-func (r *router) Navigate(route Route) tea.Cmd {
-	return func() tea.Msg {
-		return NavigateMsg{Route: route}
-	}
-}
-
-// NavigateWithData creates a navigation command with data
-func (r *router) NavigateWithData(route Route, data interface{}) tea.Cmd {
-	return func() tea.Msg {
-		return NavigateMsg{
-			Route: route,
-			Data:  data,
-		}
-	}
+	return r.controller.View()
 }

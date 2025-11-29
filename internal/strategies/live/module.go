@@ -1,11 +1,11 @@
 package live
 
 import (
+	"github.com/backtesting-org/kronos-cli/internal/services/live"
+	"github.com/backtesting-org/kronos-cli/internal/services/live/runtime"
 	"github.com/backtesting-org/kronos-cli/internal/strategies/live/handlers"
 	"github.com/backtesting-org/kronos-cli/internal/strategies/live/handlers/cli"
 	"github.com/backtesting-org/kronos-cli/internal/strategies/live/handlers/interactive"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/live/runtime"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/live/services"
 	"github.com/backtesting-org/live-trading/pkg"
 	"go.uber.org/fx"
 )
@@ -19,7 +19,7 @@ var Module = fx.Module("live",
 	runtime.Module,
 
 	// Services
-	fx.Provide(services.NewLiveService),
+	fx.Provide(live.NewLiveService),
 
 	// Sub-handlers (CLI and TUI)
 	fx.Provide(cli.NewCLILiveHandler),

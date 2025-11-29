@@ -6,35 +6,34 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
-	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/donderom/bubblon"
 )
 
 type StrategyListView interface {
 	tea.Model
 }
 
-// strategyListView represents the strategy list view (STRATEGIES screen)
 type strategyListView struct {
 	strategies      []strategy.Strategy
 	cursor          int
 	pageSize        int
 	pageNum         int
-	router          router.Router
 	compileService  shared.CompileService
 	strategyService strategy.StrategyConfig
-	detailView      StrategyDetailView
+	detailFactory   StrategyDetailViewFactory
 }
 
-func NewStrategyListView(
+// newStrategyListView is the private constructor called by the factory
+func newStrategyListView(
 	compileService shared.CompileService,
 	strategyService strategy.StrategyConfig,
-	detailView StrategyDetailView,
-) StrategyListView {
-	view := strategyListView{
+	detailFactory StrategyDetailViewFactory,
+) tea.Model {
+	view := &strategyListView{
 		compileService:  compileService,
 		strategyService: strategyService,
-		detailView:      detailView,
+		detailFactory:   detailFactory,
 	}
 
 	view.strategies, _ = strategyService.FindStrategies()
@@ -44,16 +43,18 @@ func NewStrategyListView(
 	return view
 }
 
-func (m strategyListView) Init() tea.Cmd {
+func (m *strategyListView) Init() tea.Cmd {
 	return nil
 }
 
-func (m strategyListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *strategyListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
+		case "q":
+			return m, bubblon.Cmd(bubblon.Close())
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -63,30 +64,18 @@ func (m strategyListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter":
-			// Create detail view with services this view already has
+			// Create detail view with selected strategy using factory
 			selectedStrat := &m.strategies[m.cursor]
+			detailView := m.detailFactory(selectedStrat)
 
-			m.detailView.SetStrategy(selectedStrat)
-
-			// Send navigation message with created view
-			return m, func() tea.Msg {
-				return router.NavigateMsg{
-					Route: router.RouteStrategyDetail,
-					View:  m.detailView,
-				}
-			}
-		}
-	case router.NavigateMsg:
-		// Handle navigation
-		switch msg.Route {
-		case router.RouteMenu:
-			return m, tea.Quit
+			// Use Bubblon to push the new view onto the stack
+			return m, bubblon.Open(detailView)
 		}
 	}
 	return m, nil
 }
 
-func (m strategyListView) View() string {
+func (m *strategyListView) View() string {
 	if len(m.strategies) == 0 {
 		return ui.TitleStyle.Render("STRATEGIES") + "\n\n" + ui.SubtitleStyle.Render("No strategies found. Create a new one to get started.")
 	}

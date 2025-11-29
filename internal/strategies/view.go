@@ -19,23 +19,20 @@ type StrategyBrowser interface {
 type strategyBrowser struct {
 	strategyService strategy.StrategyConfig
 	compileService  shared.CompileService
-	detailView      browse.StrategyDetailView
-	browse          browse.StrategyListView
+	listFactory     browse.StrategyListViewFactory
 	router          router.Router
 }
 
 func NewStrategyBrowser(
 	strategyService strategy.StrategyConfig,
 	compileService shared.CompileService,
-	detailView browse.StrategyDetailView,
-	browse browse.StrategyListView,
+	listFactory browse.StrategyListViewFactory,
 	r router.Router,
 ) StrategyBrowser {
 	return &strategyBrowser{
 		strategyService: strategyService,
 		compileService:  compileService,
-		detailView:      detailView,
-		browse:          browse,
+		listFactory:     listFactory,
 		router:          r,
 	}
 }
@@ -51,8 +48,11 @@ func (h *strategyBrowser) Handle(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("no strategies found")
 	}
 
+	// Create the initial view using the factory
+	initialView := h.listFactory()
+
 	// Set the initial view on the router
-	h.router.SetInitialView(h.browse)
+	h.router.SetInitialView(initialView)
 
 	// Router IS the Tea model - pass it to the program
 	p := tea.NewProgram(h.router, tea.WithAltScreen())

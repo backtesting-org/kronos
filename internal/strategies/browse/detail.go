@@ -1,59 +1,51 @@
 package browse
 
 import (
-	"fmt"
-
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/compile"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
-	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/donderom/bubblon"
 )
 
 type StrategyDetailView interface {
 	tea.Model
-	SetStrategy(*strategy.Strategy)
 }
 
-// StrategyDetailView represents the strategy detail view with action options (STRATEGY screen)
+// strategyDetailView represents the strategy detail view with action options (STRATEGY screen)
 type strategyDetailView struct {
-	tea.Model
 	strategy       *strategy.Strategy
 	actions        []string
 	cursor         int
-	router         router.Router
 	compileService shared.CompileService
 }
 
-// NewStrategyDetailView creates a strategy detail view with all dependencies
-func NewStrategyDetailView(r router.Router, cs shared.CompileService) StrategyDetailView {
-	return strategyDetailView{
-		strategy:       nil,
+// newStrategyDetailView is the private constructor called by the factory
+func newStrategyDetailView(
+	compileService shared.CompileService,
+	s *strategy.Strategy,
+) tea.Model {
+	return &strategyDetailView{
+		strategy:       s,
 		actions:        []string{"Compile", "Backtest", "Edit", "Delete"},
 		cursor:         0,
-		router:         r,
-		compileService: cs,
+		compileService: compileService,
 	}
 }
 
-func (m strategyDetailView) SetStrategy(s *strategy.Strategy) {
-	m.strategy = s
-}
-
-func (m strategyDetailView) Init() tea.Cmd {
+func (m *strategyDetailView) Init() tea.Cmd {
 	return nil
 }
 
-func (m strategyDetailView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *strategyDetailView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "q":
-			// Navigate back to list
-			return m, m.router.Navigate(router.RouteStrategyList)
+			// Pop back to list view using Bubblon
+			return m, bubblon.Cmd(bubblon.Close())
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -67,47 +59,31 @@ func (m strategyDetailView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			action := m.actions[m.cursor]
 			switch action {
 			case "Compile":
-				// Create compile view with dependencies and navigate to it
-				compileView := compile.NewCompileModel(m.compileService, m.strategy)
-				return m, func() tea.Msg {
-					return router.NavigateMsg{
-						Route: router.RouteStrategyCompile,
-						Data:  m.strategy,
-						View:  compileView,
-					}
-				}
+				// TODO: Route to compile view with strategy data
+				return m, nil
 			case "Backtest":
-				return m, m.router.NavigateWithData(router.RouteStrategyBacktest, m.strategy)
+				// TODO: Route to backtest view with strategy data
+				return m, nil
 			case "Edit":
-				return m, m.router.NavigateWithData(router.RouteStrategyEdit, m.strategy)
+				// TODO: Route to edit view with strategy data
+				return m, nil
 			case "Delete":
-				return m, m.router.NavigateWithData(router.RouteStrategyDelete, m.strategy)
+				// TODO: Handle delete action
+				return m, nil
 			}
-		}
-	case router.NavigateMsg:
-		if msg.Route == router.RouteStrategyList {
-			return m, tea.Quit
 		}
 	}
 	return m, nil
 }
 
-func (m strategyDetailView) View() string {
+func (m *strategyDetailView) View() string {
+	if m.strategy == nil {
+		return ui.BoxStyle.Render("Strategy not found")
+	}
+
 	var content string
 	content += ui.TitleStyle.Render(m.strategy.Name) + "\n"
-
-	// Display strategy metadata
-	if m.strategy.Description != "" {
-		content += ui.StrategyDescStyle.Render("📝 "+m.strategy.Description) + "\n"
-	}
-
-	content += ui.StrategyMetaStyle.Render(fmt.Sprintf("🔗 Exchanges: %v", m.strategy.Exchanges)) + "\n"
-
-	if len(m.strategy.Parameters) > 0 {
-		content += ui.StrategyMetaStyle.Render(fmt.Sprintf("⚙️  Parameters: %d", len(m.strategy.Parameters))) + "\n"
-	}
-
-	content += "\n" + ui.SubtitleStyle.Render("Select action:") + "\n\n"
+	content += ui.SubtitleStyle.Render("Select action:") + "\n\n"
 
 	for i, action := range m.actions {
 		if i == m.cursor {
