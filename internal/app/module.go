@@ -5,6 +5,7 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/handlers"
 	"github.com/backtesting-org/kronos-cli/internal/setup"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
+	"github.com/backtesting-org/kronos-cli/internal/strategies"
 	"github.com/backtesting-org/kronos-cli/internal/strategies/backtest"
 	"github.com/backtesting-org/kronos-cli/internal/strategies/live"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
@@ -20,4 +21,5 @@ var Module = fx.Options(
 	config.Module,
 	ui.Module,
 	live.Module,
+	strategies.Module,
 )

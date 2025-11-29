@@ -2,8 +2,8 @@ package handlers
 
 import (
 	setup "github.com/backtesting-org/kronos-cli/internal/setup/types"
+	"github.com/backtesting-org/kronos-cli/internal/strategies"
 	backtesting "github.com/backtesting-org/kronos-cli/internal/strategies/backtest/types"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/browse/handlers"
 	liveTypes "github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -15,7 +15,7 @@ type RootHandler interface {
 
 // RootHandler handles the root command and main menu
 type rootHandler struct {
-	strategyBrowser handlers.StrategyBrowser
+	strategyBrowser strategies.StrategyBrowser
 	initHandler     setup.InitHandler
 	liveHandler     liveTypes.LiveHandler
 	backtestHandler backtesting.BacktestHandler
@@ -23,7 +23,7 @@ type rootHandler struct {
 }
 
 func NewRootHandler(
-	strategyBrowser handlers.StrategyBrowser,
+	strategyBrowser strategies.StrategyBrowser,
 	initHandler setup.InitHandler,
 	liveHandler liveTypes.LiveHandler,
 	backtestHandler backtesting.BacktestHandler,
