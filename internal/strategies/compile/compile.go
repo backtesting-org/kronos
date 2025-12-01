@@ -5,6 +5,7 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/shared"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/donderom/bubblon"
 )
 
 type CompileModel interface {
@@ -23,18 +24,18 @@ type compileModel struct {
 
 // NewCompileModel creates a compile view with all dependencies
 func NewCompileModel(compileService shared.CompileService) CompileModel {
-	return compileModel{
+	return &compileModel{
 		strategy:       nil,
 		compileService: compileService,
 		done:           false,
 	}
 }
 
-func (m compileModel) SetStrategy(strategy *strategy.Strategy) {
+func (m *compileModel) SetStrategy(strategy *strategy.Strategy) {
 	m.strategy = strategy
 }
 
-func (m compileModel) Init() tea.Cmd {
+func (m *compileModel) Init() tea.Cmd {
 	return func() tea.Msg {
 		// Run compile in background
 		err := m.compileService.CompileStrategy(m.strategy.Path)
@@ -42,12 +43,14 @@ func (m compileModel) Init() tea.Cmd {
 	}
 }
 
-func (m compileModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *compileModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case CompileFinishedMsg:
 		m.done = true
 		m.err = msg.Err
-		return m, nil
+		// When compile finishes, replace with result view
+		resultView := NewResultModel(m.strategy, m.err)
+		return m, bubblon.Replace(resultView)
 	case tea.KeyMsg:
 		// Don't allow interaction during compile
 		return m, nil
@@ -55,7 +58,7 @@ func (m compileModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m compileModel) View() string {
+func (m *compileModel) View() string {
 	var content string
 	content += ui.TitleStyle.Render(m.strategy.Name) + "\n"
 	content += ui.SubtitleStyle.Render("Compiling...") + "\n\n"
@@ -64,17 +67,17 @@ func (m compileModel) View() string {
 }
 
 // Done returns whether compilation is complete
-func (m compileModel) Done() bool {
+func (m *compileModel) Done() bool {
 	return m.done
 }
 
 // GetStrategy returns the strategy being compiled
-func (m compileModel) GetStrategy() *strategy.Strategy {
+func (m *compileModel) GetStrategy() *strategy.Strategy {
 	return m.strategy
 }
 
 // GetError returns any compilation error
-func (m compileModel) GetError() error {
+func (m *compileModel) GetError() error {
 	return m.err
 }
 

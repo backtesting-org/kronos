@@ -6,39 +6,39 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/donderom/bubblon"
 )
 
-type ResultModel struct {
-	strategy     *strategy.Strategy
-	err          error
-	backToDetail bool
+type resultModel struct {
+	strategy *strategy.Strategy
+	err      error
 }
 
-// NewResultModel creates a result model - called directly when compile finishes
-func NewResultModel(strat *strategy.Strategy, err error) ResultModel {
-	return ResultModel{
-		strategy:     strat,
-		err:          err,
-		backToDetail: false,
+// NewResultModel creates a result model that shows compilation result
+func NewResultModel(strat *strategy.Strategy, err error) tea.Model {
+	return &resultModel{
+		strategy: strat,
+		err:      err,
 	}
 }
 
-func (m ResultModel) Init() tea.Cmd {
+func (m *resultModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m ResultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "enter":
-			m.backToDetail = true
+			// Return to detail view (parent) by closing this result view
+			return m, bubblon.Cmd(bubblon.Close())
 		}
 	}
 	return m, nil
 }
 
-func (m ResultModel) View() string {
+func (m *resultModel) View() string {
 	var content string
 	content += ui.TitleStyle.Render(m.strategy.Name) + "\n"
 
@@ -54,14 +54,4 @@ func (m ResultModel) View() string {
 	content += "\n" + ui.SubtitleStyle.Render("Press Enter or q to go back")
 
 	return ui.BoxStyle.Render(content)
-}
-
-// ShouldBackToDetail returns whether to navigate back to detail
-func (m ResultModel) ShouldBackToDetail() bool {
-	return m.backToDetail
-}
-
-// Reset clears the back flag
-func (m ResultModel) Reset() {
-	m.backToDetail = false
 }

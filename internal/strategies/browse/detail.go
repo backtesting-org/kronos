@@ -3,6 +3,7 @@ package browse
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/compile"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/donderom/bubblon"
@@ -18,11 +19,13 @@ type strategyDetailView struct {
 	actions        []string
 	cursor         int
 	compileService shared.CompileService
+	compileFactory compile.CompileViewFactory
 }
 
 // newStrategyDetailView is the private constructor called by the factory
 func newStrategyDetailView(
 	compileService shared.CompileService,
+	compileFactory compile.CompileViewFactory,
 	s *strategy.Strategy,
 ) tea.Model {
 	return &strategyDetailView{
@@ -30,6 +33,7 @@ func newStrategyDetailView(
 		actions:        []string{"Compile", "Backtest", "Edit", "Delete"},
 		cursor:         0,
 		compileService: compileService,
+		compileFactory: compileFactory,
 	}
 }
 
@@ -59,8 +63,8 @@ func (m *strategyDetailView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			action := m.actions[m.cursor]
 			switch action {
 			case "Compile":
-				// TODO: Route to compile view with strategy data
-				return m, nil
+				compileView := m.compileFactory(m.strategy)
+				return m, bubblon.Open(compileView)
 			case "Backtest":
 				// TODO: Route to backtest view with strategy data
 				return m, nil

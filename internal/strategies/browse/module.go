@@ -3,6 +3,7 @@ package browse
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/compile"
 	tea "github.com/charmbracelet/bubbletea"
 	"go.uber.org/fx"
 )
@@ -40,10 +41,12 @@ func NewStrategyListViewFactory(
 // All singleton dependencies are captured by the closure
 func NewStrategyDetailViewFactory(
 	compileService shared.CompileService,
+	compileFactory compile.CompileViewFactory,
 ) StrategyDetailViewFactory {
 	return func(s *strategy.Strategy) tea.Model {
 		return newStrategyDetailView(
 			compileService,
+			compileFactory,
 			s,
 		)
 	}
