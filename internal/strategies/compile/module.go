@@ -2,7 +2,7 @@ package compile
 
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/shared"
+	"github.com/backtesting-org/kronos-cli/internal/services/compile"
 	tea "github.com/charmbracelet/bubbletea"
 	"go.uber.org/fx"
 )
@@ -19,7 +19,7 @@ var Module = fx.Module("compile",
 
 // NewCompileViewFactory creates the factory function for compile views
 func NewCompileViewFactory(
-	compileService shared.CompileService,
+	compileService compile.CompileService,
 ) CompileViewFactory {
 	return func(s *strategy.Strategy) tea.Model {
 		model := NewCompileModel(compileService)

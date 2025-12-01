@@ -1,4 +1,4 @@
-package shared
+package compile
 
 import (
 	"fmt"
@@ -44,8 +44,19 @@ func (s *compileService) CompileStrategy(strategyPath string) error {
 		return nil
 	}
 
+	_ = os.Remove(soPath)
+
 	// Need to compile
 	fmt.Printf("🔨 Compiling %s strategy...\n", strategyName)
+
+	// Clear build cache to ensure fresh compilation with current SDK
+	fmt.Printf("  🧹 Clearing build cache...\n")
+	cleanCmd := exec.Command("go", "clean", "-cache")
+	cleanCmd.Dir = strategyPath
+	if err := cleanCmd.Run(); err != nil {
+		// Non-fatal, continue anyway
+		fmt.Printf("  ⚠️  Cache clear warning (continuing): %v\n", err)
+	}
 
 	// First, run go mod tidy to ensure all dependencies are downloaded
 	fmt.Printf("  📦 Downloading dependencies...\n")
@@ -56,11 +67,11 @@ func (s *compileService) CompileStrategy(strategyPath string) error {
 		return fmt.Errorf("failed to download dependencies: %s", string(tidyOutput))
 	}
 
-	// Now compile the plugin
+	// Now compile the plugin with -a flag (force rebuild all packages)
 	fmt.Printf("  🔧 Building plugin...\n")
 	// Use relative paths since we're setting cmd.Dir to strategyPath
 	outputFileName := strategyName + ".so"
-	cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", outputFileName, "strategy.go")
+	cmd := exec.Command("go", "build", "-a", "-buildmode=plugin", "-o", outputFileName, "strategy.go")
 	cmd.Dir = strategyPath
 
 	// Capture both stdout and stderr to show detailed error messages

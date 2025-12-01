@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	live "github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/live"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
