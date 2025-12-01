@@ -1,15 +1,11 @@
 package interactive
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/live/types"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 	tea "github.com/charmbracelet/bubbletea"
@@ -22,15 +18,17 @@ type LiveInteractive interface {
 
 type live struct {
 	service types.LiveService
+	router  router.Router
 }
 
-func NewTUIHandler(service types.LiveService) LiveInteractive {
+func NewTUIHandler(service types.LiveService, r router.Router) LiveInteractive {
 	return &live{
 		service: service,
+		router:  r,
 	}
 }
 
-// Run executes the TUI flow - this is where Tea orchestration lives
+// Run executes the TUI flow - initializes the router with the selection model
 func (l *live) Run() error {
 	// 1. Load data from service
 	strategies, err := l.service.FindStrategies()
@@ -38,42 +36,23 @@ func (l *live) Run() error {
 		return err
 	}
 
+	// 2. Create the initial view using the factory pattern
 	model := NewSelectionModel(strategies, l.service)
-	program := tea.NewProgram(model, tea.WithAltScreen())
 
-	finalModel, err := program.Run()
+	// 3. Set the initial view on the router
+	l.router.SetInitialView(model)
+
+	// 4. Router IS the Tea model - pass it to the program
+	program := tea.NewProgram(l.router, tea.WithAltScreen())
+
+	_, err = program.Run()
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
 
-	// 3. Handle result
-	result, ok := finalModel.(SelectionModel)
-	if !ok {
-		return fmt.Errorf("unexpected model type")
-	}
-
-	if result.Err() != nil {
-		return result.Err()
-	}
-
-	// 4. Execute if user selected something
-	if result.Selected() != nil {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		// Handle Ctrl+C
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-		go func() {
-			<-sigChan
-			fmt.Println("\n\n🛑 Stopping strategy...")
-			cancel()
-		}()
-
-		// Service handles all exchange/connector logic
-		return l.service.ExecuteStrategy(ctx, result.Selected(), nil)
-	}
+	// 5. After Tea program exits, we need to check if user selected a strategy
+	// Note: This requires the SelectionModel to store its state in a way accessible after exit
+	// For now, we'll handle strategy execution within the TUI lifecycle via a different mechanism
 
 	return nil
 }
@@ -138,11 +117,7 @@ func (m SelectionModel) updateEmptyState(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y":
 		// User wants to initialize a new project
-		if m.router != nil {
-			// Navigate to init using router
-			return m, m.router.Navigate(router.RouteInit)
-		}
-		// Fallback: set error flag that will be checked after TUI exits
+		// Set error that indicates init was requested - handler will check this after exit
 		m.err = fmt.Errorf("INIT_PROJECT_REQUESTED")
 		return m, tea.Quit
 

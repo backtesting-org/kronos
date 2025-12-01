@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/backtesting-org/kronos-cli/internal/live/runtime"
+	"github.com/backtesting-org/kronos-cli/internal/services/live/runtime"
 	"github.com/spf13/cobra"
 )
 

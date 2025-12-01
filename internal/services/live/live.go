@@ -1,4 +1,4 @@
-package services
+package live
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/config/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/config/settings"
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/live/types"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 )
 

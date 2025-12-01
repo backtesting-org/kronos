@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	backtesting "github.com/backtesting-org/kronos-cli/internal/backtesting/types"
-	liveTypes "github.com/backtesting-org/kronos-cli/internal/live/types"
 	setup "github.com/backtesting-org/kronos-cli/internal/setup/types"
+	"github.com/backtesting-org/kronos-cli/internal/strategies"
+	backtesting "github.com/backtesting-org/kronos-cli/internal/strategies/backtest/types"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
@@ -14,21 +14,21 @@ type RootHandler interface {
 
 // RootHandler handles the root command and main menu
 type rootHandler struct {
+	strategyBrowser strategies.StrategyBrowser
 	initHandler     setup.InitHandler
-	liveHandler     liveTypes.LiveHandler
 	backtestHandler backtesting.BacktestHandler
 	analyzeHandler  backtesting.AnalyzeHandler
 }
 
 func NewRootHandler(
+	strategyBrowser strategies.StrategyBrowser,
 	initHandler setup.InitHandler,
-	liveHandler liveTypes.LiveHandler,
 	backtestHandler backtesting.BacktestHandler,
 	analyzeHandler backtesting.AnalyzeHandler,
 ) RootHandler {
 	return &rootHandler{
+		strategyBrowser: strategyBrowser,
 		initHandler:     initHandler,
-		liveHandler:     liveHandler,
 		backtestHandler: backtestHandler,
 		analyzeHandler:  analyzeHandler,
 	}
@@ -47,11 +47,10 @@ func (h *rootHandler) Handle(cmd *cobra.Command, args []string) error {
 func (h *rootHandler) runMainMenu(rootCmd *cobra.Command) error {
 	m := mainMenuModel{
 		choices: []string{
-			"Start Live Trading",
-			"Run Backtest",
-			"Analyze Results",
+			"Strategies",
+			"Settings",
+			"Help",
 			"Create New Project",
-			"Show Help",
 		},
 	}
 
@@ -67,17 +66,22 @@ func (h *rootHandler) runMainMenu(rootCmd *cobra.Command) error {
 	}
 
 	switch result.selected {
-	case "Start Live Trading":
-		return h.liveHandler.Handle(rootCmd, []string{})
-	case "Run Backtest":
-		return h.backtestHandler.Handle(rootCmd, []string{})
-	case "Analyze Results":
-		return h.analyzeHandler.Handle(rootCmd, []string{})
+	case "Strategies":
+		return h.strategyBrowser.Handle(rootCmd, []string{})
+	case "Settings":
+		return h.handleSettings(rootCmd)
+	case "Help":
+		return showHelp()
 	case "Create New Project":
 		return h.handleCreateProject(rootCmd)
-	case "Show Help":
-		return showHelp()
 	}
 
+	return nil
+}
+
+// handleSettings opens the settings/configuration menu
+func (h *rootHandler) handleSettings(_ *cobra.Command) error {
+	// For now, this is a placeholder that will open a settings TUI
+	// TODO: Implement settings UI to edit exchanges/connectors
 	return nil
 }

@@ -3,9 +3,9 @@ package handlers
 import (
 	"fmt"
 
-	"github.com/backtesting-org/kronos-cli/internal/live/handlers/cli"
-	"github.com/backtesting-org/kronos-cli/internal/live/handlers/interactive"
-	"github.com/backtesting-org/kronos-cli/internal/live/types"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/live/handlers/cli"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/live/handlers/interactive"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
 	"github.com/spf13/cobra"
 )
 

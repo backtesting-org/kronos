@@ -1,8 +1,8 @@
 package services
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/backtesting/types"
 	"github.com/backtesting-org/kronos-cli/internal/config/settings"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/backtest/types"
 )
 
 // backtestService handles backtest operations
