@@ -8,7 +8,6 @@ import (
 var Module = fx.Module("shared",
 	// Services
 	fx.Provide(
-		NewCompileService,
 		NewStrategyDiscovery,
 	),
 )

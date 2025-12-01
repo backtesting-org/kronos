@@ -2,7 +2,7 @@ package compile
 
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/shared"
+	"github.com/backtesting-org/kronos-cli/internal/services/compile"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/donderom/bubblon"
@@ -16,14 +16,14 @@ type CompileModel interface {
 
 type compileModel struct {
 	strategy       *strategy.Strategy
-	compileService shared.CompileService
+	compileService compile.CompileService
 	done           bool
 	err            error
 	output         string
 }
 
 // NewCompileModel creates a compile view with all dependencies
-func NewCompileModel(compileService shared.CompileService) CompileModel {
+func NewCompileModel(compileService compile.CompileService) CompileModel {
 	return &compileModel{
 		strategy:       nil,
 		compileService: compileService,

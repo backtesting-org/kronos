@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
+	"github.com/backtesting-org/kronos-cli/internal/services/live"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/donderom/bubblon"
@@ -14,7 +14,7 @@ type LiveViewFactory func(*strategy.Strategy) tea.Model
 
 // NewLiveViewFactory creates the factory function for live trading views
 func NewLiveViewFactory(
-	liveService types.LiveService,
+	liveService live.LiveService,
 ) LiveViewFactory {
 	return func(s *strategy.Strategy) tea.Model {
 		return NewLiveModel(s, liveService)
@@ -23,7 +23,7 @@ func NewLiveViewFactory(
 
 type liveModel struct {
 	strategy  *strategy.Strategy
-	service   types.LiveService
+	service   live.LiveService
 	isRunning bool
 	err       error
 	ctx       context.Context
@@ -31,7 +31,7 @@ type liveModel struct {
 }
 
 // NewLiveModel creates a live trading view
-func NewLiveModel(strat *strategy.Strategy, service types.LiveService) tea.Model {
+func NewLiveModel(strat *strategy.Strategy, service live.LiveService) tea.Model {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &liveModel{
 		strategy:  strat,

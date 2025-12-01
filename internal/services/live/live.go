@@ -5,38 +5,48 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/config/settings"
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
+	"github.com/backtesting-org/kronos-cli/internal/services/compile"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
+	"github.com/backtesting-org/kronos-cli/pkg/live"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 )
+
+type LiveService interface {
+	FindStrategies() ([]strategy.Strategy, error)
+	FindConnectors() []settings.Connector
+	ValidateStrategy(strat *strategy.Strategy) error
+	ExecuteStrategy(ctx context.Context, strategy *strategy.Strategy, exchange *settings.Connector) error
+}
 
 // liveService orchestrates live trading by coordinating other services
 type liveService struct {
 	settings         settings.Configuration
 	connectorService connectors.ConnectorService
-	compile          shared.CompileService
+	compile          compile.CompileService
 	discover         shared.StrategyDiscovery
 	logger           logging.ApplicationLogger
+	manager          live.InstanceManager
 }
 
 func NewLiveService(
 	kronos settings.Configuration,
 	connectorService connectors.ConnectorService,
-	compileSvc shared.CompileService,
+	compileSvc compile.CompileService,
 	discovery shared.StrategyDiscovery,
 	logger logging.ApplicationLogger,
-) types.LiveService {
+	manager live.InstanceManager,
+) LiveService {
 	return &liveService{
 		settings:         kronos,
 		connectorService: connectorService,
 		compile:          compileSvc,
 		discover:         discovery,
 		logger:           logger,
+		manager:          manager,
 	}
 }
 
@@ -133,25 +143,19 @@ func (s *liveService) ExecuteStrategy(ctx context.Context, strat *strategy.Strat
 		return fmt.Errorf("failed to compile strategy: %w", err)
 	}
 
-	// 3. Spawn kronos with run-strategy subcommand
-	args := []string{
-		"run-strategy",
-		"--strategy", strat.Name,
+	// 3. Get current working directory as framework root
+	frameworkRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	if strat.Execution.DryRun {
-		args = append(args, "--dry-run")
-	}
-
-	cmd := exec.Command("kronos", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	s.logger.Info("Spawning strategy instance",
+	// 4. Start instance using manager (replaces cmd.Start())
+	s.logger.Info("Starting strategy instance via manager",
 		"strategy", strat.Name,
 		"exchanges", strat.Exchanges,
+		"framework_root", frameworkRoot,
 	)
 
-	// Start in background - don't wait for it to finish
-	return cmd.Start()
+	_, err = s.manager.Start(ctx, strat, frameworkRoot)
+	return err
 }
