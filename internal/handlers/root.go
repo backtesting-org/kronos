@@ -4,7 +4,6 @@ import (
 	setup "github.com/backtesting-org/kronos-cli/internal/setup/types"
 	"github.com/backtesting-org/kronos-cli/internal/strategies"
 	backtesting "github.com/backtesting-org/kronos-cli/internal/strategies/backtest/types"
-	liveTypes "github.com/backtesting-org/kronos-cli/internal/strategies/live/types"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +16,6 @@ type RootHandler interface {
 type rootHandler struct {
 	strategyBrowser strategies.StrategyBrowser
 	initHandler     setup.InitHandler
-	liveHandler     liveTypes.LiveHandler
 	backtestHandler backtesting.BacktestHandler
 	analyzeHandler  backtesting.AnalyzeHandler
 }
@@ -25,14 +23,12 @@ type rootHandler struct {
 func NewRootHandler(
 	strategyBrowser strategies.StrategyBrowser,
 	initHandler setup.InitHandler,
-	liveHandler liveTypes.LiveHandler,
 	backtestHandler backtesting.BacktestHandler,
 	analyzeHandler backtesting.AnalyzeHandler,
 ) RootHandler {
 	return &rootHandler{
 		strategyBrowser: strategyBrowser,
 		initHandler:     initHandler,
-		liveHandler:     liveHandler,
 		backtestHandler: backtestHandler,
 		analyzeHandler:  analyzeHandler,
 	}

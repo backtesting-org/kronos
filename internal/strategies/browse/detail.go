@@ -2,12 +2,24 @@ package browse
 
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/shared"
 	"github.com/backtesting-org/kronos-cli/internal/strategies/compile"
+	"github.com/backtesting-org/kronos-cli/internal/strategies/live"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/donderom/bubblon"
 )
+
+type ActionType int
+
+const (
+	ActionCompile ActionType = iota
+	ActionStartTrading
+)
+
+var actionNames = map[ActionType]string{
+	ActionCompile:      "Compile",
+	ActionStartTrading: "Start Trading",
+}
 
 type StrategyDetailView interface {
 	tea.Model
@@ -16,24 +28,24 @@ type StrategyDetailView interface {
 // strategyDetailView represents the strategy detail view with action options (STRATEGY screen)
 type strategyDetailView struct {
 	strategy       *strategy.Strategy
-	actions        []string
+	actions        []ActionType
 	cursor         int
-	compileService shared.CompileService
 	compileFactory compile.CompileViewFactory
+	liveFactory    live.LiveViewFactory
 }
 
 // newStrategyDetailView is the private constructor called by the factory
 func newStrategyDetailView(
-	compileService shared.CompileService,
 	compileFactory compile.CompileViewFactory,
+	liveFactory live.LiveViewFactory,
 	s *strategy.Strategy,
 ) tea.Model {
 	return &strategyDetailView{
 		strategy:       s,
-		actions:        []string{"Compile", "Backtest", "Edit", "Delete"},
+		actions:        []ActionType{ActionCompile, ActionStartTrading},
 		cursor:         0,
-		compileService: compileService,
 		compileFactory: compileFactory,
+		liveFactory:    liveFactory,
 	}
 }
 
@@ -62,18 +74,12 @@ func (m *strategyDetailView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Navigate to selected action
 			action := m.actions[m.cursor]
 			switch action {
-			case "Compile":
+			case ActionCompile:
 				compileView := m.compileFactory(m.strategy)
 				return m, bubblon.Open(compileView)
-			case "Backtest":
-				// TODO: Route to backtest view with strategy data
-				return m, nil
-			case "Edit":
-				// TODO: Route to edit view with strategy data
-				return m, nil
-			case "Delete":
-				// TODO: Handle delete action
-				return m, nil
+			case ActionStartTrading:
+				liveView := m.liveFactory(m.strategy)
+				return m, bubblon.Open(liveView)
 			}
 		}
 	}
@@ -90,10 +96,11 @@ func (m *strategyDetailView) View() string {
 	content += ui.SubtitleStyle.Render("Select action:") + "\n\n"
 
 	for i, action := range m.actions {
+		actionName := actionNames[action]
 		if i == m.cursor {
-			content += ui.StrategyNameSelectedStyle.Render("▶ "+action) + "\n"
+			content += ui.StrategyNameSelectedStyle.Render("▶ "+actionName) + "\n"
 		} else {
-			content += "  " + action + "\n"
+			content += "  " + actionName + "\n"
 		}
 	}
 
