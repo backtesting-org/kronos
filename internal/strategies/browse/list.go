@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/services/compile"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
+	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/donderom/bubblon"
 )
@@ -19,14 +19,14 @@ type strategyListView struct {
 	cursor          int
 	pageSize        int
 	pageNum         int
-	compileService  compile.CompileService
+	compileService  strategyTypes.CompileService
 	strategyService strategy.StrategyConfig
 	detailFactory   StrategyDetailViewFactory
 }
 
 // newStrategyListView is the private constructor called by the factory
 func newStrategyListView(
-	compileService compile.CompileService,
+	compileService strategyTypes.CompileService,
 	strategyService strategy.StrategyConfig,
 	detailFactory StrategyDetailViewFactory,
 ) tea.Model {

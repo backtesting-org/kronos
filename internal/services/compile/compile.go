@@ -5,19 +5,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-)
 
-type CompileService interface {
-	CompileStrategy(strategyPath string) error
-	PreCompileStrategies(strategiesDir string) map[string]error
-	IsCompiled(strategyPath string) bool
-	NeedsRecompile(strategyPath string) bool
-}
+	"github.com/backtesting-org/kronos-cli/pkg/strategy"
+)
 
 // compileService handles compilation of strategies into .so plugins
 type compileService struct{}
 
-func NewCompileService() CompileService {
+func NewCompileService() strategy.CompileService {
 	return &compileService{}
 }
 

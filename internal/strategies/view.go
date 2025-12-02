@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/services/compile"
 	"github.com/backtesting-org/kronos-cli/internal/strategies/browse"
 	"github.com/backtesting-org/kronos-cli/internal/ui/router"
+	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
@@ -18,14 +18,14 @@ type StrategyBrowser interface {
 
 type strategyBrowser struct {
 	strategyService strategy.StrategyConfig
-	compileService  compile.CompileService
+	compileService  strategyTypes.CompileService
 	listFactory     browse.StrategyListViewFactory
 	router          router.Router
 }
 
 func NewStrategyBrowser(
 	strategyService strategy.StrategyConfig,
-	compileService compile.CompileService,
+	compileService strategyTypes.CompileService,
 	listFactory browse.StrategyListViewFactory,
 	r router.Router,
 ) StrategyBrowser {

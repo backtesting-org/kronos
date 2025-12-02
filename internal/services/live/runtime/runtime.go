@@ -7,7 +7,10 @@ import (
 
 	"github.com/backtesting-org/kronos-cli/internal/config/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
+	"github.com/backtesting-org/kronos-cli/pkg/live"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/portfolio"
 	"github.com/backtesting-org/live-trading/pkg/startup"
 )
 
@@ -23,7 +26,7 @@ func NewRuntime(
 	runtime startup.Startup,
 	connectorSvc connectors.ConnectorService,
 	strategyConf strategy.StrategyConfig,
-) Runtime {
+) live.Runtime {
 	return &liveRuntime{
 		logger:       logger,
 		startup:      runtime,
@@ -57,10 +60,16 @@ func (r *liveRuntime) Run(ctx context.Context, strategyDir string) error {
 	// 4. Execute the strategy using the SDK startup
 	r.logger.Info("Starting live trading startup", "strategy", strat.Name, "exchanges", len(connectorConfigs))
 
+	assetConfigs := r.convertConfigAssetsToInstruments(strat)
+
 	// Run in a goroutine and monitor context for cancellation
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- r.startup.Start(soPath, connectorConfigs)
+		errChan <- r.startup.Start(
+			soPath,
+			connectorConfigs,
+			assetConfigs,
+		)
 	}()
 
 	// Wait for either completion or cancellation
@@ -78,4 +87,32 @@ func (r *liveRuntime) Run(ctx context.Context, strategyDir string) error {
 
 	r.logger.Info("Live trading startup stopped")
 	return nil
+}
+
+// convertConfigAssetsToInstruments converts string instrument names to SDK connector.Instrument enums
+func (r *liveRuntime) convertConfigAssetsToInstruments(strat *strategy.Strategy) map[portfolio.Asset][]connector.Instrument {
+	instrumentMap := make(map[portfolio.Asset][]connector.Instrument)
+
+	for _, assets := range strat.Assets {
+		for _, asset := range assets {
+			instruments := make([]connector.Instrument, 0, len(asset.Instruments))
+
+			for _, instStr := range asset.Instruments {
+				switch instStr {
+				case "spot":
+					instruments = append(instruments, connector.TypeSpot)
+				case "perpetual":
+					instruments = append(instruments, connector.TypePerpetual)
+				default:
+					r.logger.Warn("Unknown instrument type", "instrument", instStr)
+				}
+			}
+
+			if len(instruments) > 0 {
+				instrumentMap[portfolio.NewAsset(asset.Symbol)] = instruments
+			}
+		}
+	}
+
+	return instrumentMap
 }

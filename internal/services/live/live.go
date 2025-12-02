@@ -8,8 +8,9 @@ import (
 
 	"github.com/backtesting-org/kronos-cli/internal/config/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/config/settings"
+	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
+
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/services/compile"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
 	"github.com/backtesting-org/kronos-cli/pkg/live"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
@@ -26,7 +27,7 @@ type LiveService interface {
 type liveService struct {
 	settings         settings.Configuration
 	connectorService connectors.ConnectorService
-	compile          compile.CompileService
+	compile          strategyTypes.CompileService
 	discover         shared.StrategyDiscovery
 	logger           logging.ApplicationLogger
 	manager          live.InstanceManager
@@ -35,7 +36,7 @@ type liveService struct {
 func NewLiveService(
 	kronos settings.Configuration,
 	connectorService connectors.ConnectorService,
-	compileSvc compile.CompileService,
+	compileSvc strategyTypes.CompileService,
 	discovery shared.StrategyDiscovery,
 	logger logging.ApplicationLogger,
 	manager live.InstanceManager,

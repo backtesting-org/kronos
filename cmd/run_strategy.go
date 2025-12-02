@@ -8,16 +8,16 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/backtesting-org/kronos-cli/internal/services/live/runtime"
+	"github.com/backtesting-org/kronos-cli/pkg/live"
 	"github.com/spf13/cobra"
 )
 
 type RunStrategyCommand struct {
 	Cmd     *cobra.Command
-	runtime runtime.Runtime
+	runtime live.Runtime
 }
 
-func NewRunStrategyCommand(rt runtime.Runtime) *RunStrategyCommand {
+func NewRunStrategyCommand(rt live.Runtime) *RunStrategyCommand {
 	rsc := &RunStrategyCommand{
 		runtime: rt,
 	}
