@@ -10,7 +10,6 @@ type Configuration interface {
 type Settings struct {
 	Version    string         `mapstructure:"version"`
 	Backtest   BacktestConfig `mapstructure:"backtest"`
-	Live       LiveConfig     `mapstructure:"live"`
 	Connectors []Connector    `mapstructure:"connectors"`
 }
 

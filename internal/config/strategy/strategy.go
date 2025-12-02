@@ -30,7 +30,7 @@ func (c *strategyConfig) Load(path string) (*Strategy, error) {
 
 	// Initialize assets map if nil
 	if cfg.Assets == nil {
-		cfg.Assets = make(map[string][]string)
+		cfg.Assets = map[string][]Asset{}
 	}
 
 	// Initialize parameters map if nil

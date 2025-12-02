@@ -2,9 +2,9 @@ package browse
 
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	compile2 "github.com/backtesting-org/kronos-cli/internal/services/compile"
 	"github.com/backtesting-org/kronos-cli/internal/strategies/compile"
 	"github.com/backtesting-org/kronos-cli/internal/strategies/live"
+	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
 	tea "github.com/charmbracelet/bubbletea"
 	"go.uber.org/fx"
 )
@@ -25,7 +25,7 @@ var Module = fx.Module("browse",
 // NewStrategyListViewFactory creates the factory function for list views
 // All singleton dependencies are captured by the closure
 func NewStrategyListViewFactory(
-	compileService compile2.CompileService,
+	compileService strategyTypes.CompileService,
 	strategyService strategy.StrategyConfig,
 	detailFactory StrategyDetailViewFactory,
 ) StrategyListViewFactory {
@@ -41,7 +41,7 @@ func NewStrategyListViewFactory(
 // NewStrategyDetailViewFactory creates the factory function for detail views
 // All singleton dependencies are captured by the closure
 func NewStrategyDetailViewFactory(
-	compileService compile2.CompileService,
+	compileService strategyTypes.CompileService,
 	compileFactory compile.CompileViewFactory,
 	liveFactory live.LiveViewFactory,
 ) StrategyDetailViewFactory {
