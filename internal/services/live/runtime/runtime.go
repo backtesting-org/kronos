@@ -3,7 +3,10 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
@@ -62,30 +65,28 @@ func (r *liveRuntime) Run(ctx context.Context, strategyDir string) error {
 
 	assetConfigs := r.convertConfigAssetsToInstruments(strat)
 
-	// Run in a goroutine and monitor context for cancellation
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- r.startup.Start(
-			soPath,
-			connectorConfigs,
-			assetConfigs,
-		)
-	}()
-
-	// Wait for either completion or cancellation
-	select {
-	case <-ctx.Done():
-		r.logger.Info("Shutdown signal received, stopping strategy")
-		// Context cancelled - return the error immediately
-		// The SDK startup execution in the goroutine will be orphaned and cleaned up by the OS
-		return ctx.Err()
-	case err := <-errChan:
-		if err != nil {
-			return fmt.Errorf("startup error: %w", err)
-		}
+	// Start SDK startup (initializes everything)
+	err = r.startup.Start(
+		soPath,
+		connectorConfigs,
+		assetConfigs,
+	)
+	if err != nil {
+		return fmt.Errorf("startup error: %w", err)
 	}
 
-	r.logger.Info("Live trading startup stopped")
+	r.logger.Info("✅ SDK startup complete, keeping process alive...")
+
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Block indefinitely - this child process stays alive trading
+	// Strategy execution happens in SDK's background goroutines
+	// Only exits when receiving SIGTERM (from manager.Stop()) or manual interrupt
+	sig := <-sigChan
+	r.logger.Info("Received shutdown signal", "signal", sig)
+
 	return nil
 }
 
