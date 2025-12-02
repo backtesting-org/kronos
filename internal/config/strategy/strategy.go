@@ -73,6 +73,7 @@ func (c *strategyConfig) FindStrategies() ([]Strategy, error) {
 	var strategies []Strategy
 
 	for _, entry := range entries {
+		fmt.Println("Found entry:", entry.Name())
 		if !entry.IsDir() {
 			continue
 		}
@@ -90,15 +91,9 @@ func (c *strategyConfig) FindStrategies() ([]Strategy, error) {
 		// Load and parse the config
 		cfg, err := c.Load(configPath)
 		if err != nil {
+			fmt.Printf("Warning: failed to load strategy config for %s: %v\n", strategyName, err)
 			// Config is invalid, skip this strategy
 			continue
-		}
-
-		// Check if .so file exists
-		soPath := filepath.Join(strategyPath, strategyName+".so")
-		if _, err := os.Stat(soPath); os.IsNotExist(err) {
-			// Strategy not built yet, mark status as error
-			cfg.Status = StatusError
 		}
 
 		cfg.Path = strategyPath
