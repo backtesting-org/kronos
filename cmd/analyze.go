@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	backtesting "github.com/backtesting-org/kronos-cli/internal/strategies/backtest/types"
+	backtesting "github.com/backtesting-org/kronos-cli/internal/handlers/strategies/backtest/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
