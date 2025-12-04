@@ -11,6 +11,7 @@ type Route string
 const (
 	RouteInit             Route = "init"
 	RouteLive             Route = "live"
+	RouteMonitor          Route = "monitor"
 	RouteBacktest         Route = "backtest"
 	RouteAnalyze          Route = "analyze"
 	RouteMenu             Route = "menu"
