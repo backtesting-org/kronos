@@ -6,6 +6,7 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/monitor"
 	setup "github.com/backtesting-org/kronos-cli/internal/setup/types"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/donderom/bubblon"
 	"github.com/spf13/cobra"
 )
 
@@ -96,7 +97,14 @@ func (h *rootHandler) handleSettings(_ *cobra.Command) error {
 // handleMonitor opens the monitor TUI for running strategies
 func (h *rootHandler) handleMonitor(_ *cobra.Command) error {
 	monitorView := h.monitorViewFactory()
-	p := tea.NewProgram(monitorView, tea.WithAltScreen())
-	_, err := p.Run()
+
+	// Wrap in bubblon controller so Open/Close navigation works
+	controller, err := bubblon.New(monitorView)
+	if err != nil {
+		return err
+	}
+
+	p := tea.NewProgram(controller, tea.WithAltScreen())
+	_, err = p.Run()
 	return err
 }

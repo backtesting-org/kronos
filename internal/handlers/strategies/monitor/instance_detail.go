@@ -7,6 +7,8 @@ import (
 
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/strategy"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -38,26 +40,35 @@ type instanceDetailModel struct {
 	// Cached data
 	pnl       *monitoring.PnLView
 	metrics   *monitoring.StrategyMetrics
-	positions interface{} // TODO: proper type
-	orderbook interface{} // TODO: proper type
-	trades    interface{} // TODO: proper type
+	positions *strategy.StrategyExecution
+	orderbook *connector.OrderBook
+	trades    []connector.Trade
+
+	// Orderbook settings
+	selectedAsset string
+	depthLevels   int // 5, 10, or 20
 }
 
 // NewInstanceDetailModel creates a detail view for an instance
 func NewInstanceDetailModel(querier monitoring.ViewQuerier, instanceID string) tea.Model {
 	return &instanceDetailModel{
-		BaseModel:  ui.BaseModel{IsRoot: false}, // This is opened from instance list
-		querier:    querier,
-		instanceID: instanceID,
-		activeTab:  TabOverview,
-		loading:    true,
+		BaseModel:     ui.BaseModel{IsRoot: false},
+		querier:       querier,
+		instanceID:    instanceID,
+		activeTab:     TabOverview,
+		loading:       true,
+		selectedAsset: "BTC/USDT", // Default asset
+		depthLevels:   10,
 	}
 }
 
 type detailDataLoadedMsg struct {
-	pnl     *monitoring.PnLView
-	metrics *monitoring.StrategyMetrics
-	err     error
+	pnl       *monitoring.PnLView
+	metrics   *monitoring.StrategyMetrics
+	positions *strategy.StrategyExecution
+	orderbook *connector.OrderBook
+	trades    []connector.Trade
+	err       error
 }
 
 type detailTickMsg time.Time
@@ -81,17 +92,33 @@ func (m *instanceDetailModel) tickCmd() tea.Cmd {
 
 func (m *instanceDetailModel) loadData() tea.Cmd {
 	return func() tea.Msg {
+		var result detailDataLoadedMsg
+
+		// Load PnL
 		pnl, err := m.querier.QueryPnL(m.instanceID)
 		if err != nil {
-			return detailDataLoadedMsg{err: err}
+			result.err = err
+			return result
 		}
+		result.pnl = pnl
 
+		// Load metrics
 		metrics, _ := m.querier.QueryMetrics(m.instanceID)
+		result.metrics = metrics
 
-		return detailDataLoadedMsg{
-			pnl:     pnl,
-			metrics: metrics,
-		}
+		// Load positions
+		positions, _ := m.querier.QueryPositions(m.instanceID)
+		result.positions = positions
+
+		// Load orderbook for selected asset
+		orderbook, _ := m.querier.QueryOrderbook(m.instanceID, m.selectedAsset)
+		result.orderbook = orderbook
+
+		// Load recent trades
+		trades, _ := m.querier.QueryRecentTrades(m.instanceID, 20)
+		result.trades = trades
+
+		return result
 	}
 }
 
@@ -108,6 +135,9 @@ func (m *instanceDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err == nil {
 			m.pnl = msg.pnl
 			m.metrics = msg.metrics
+			m.positions = msg.positions
+			m.orderbook = msg.orderbook
+			m.trades = msg.trades
 		}
 		return m, nil
 
@@ -124,7 +154,6 @@ func (m *instanceDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-
 		case "left", "h":
 			if m.activeTab > 0 {
 				m.activeTab--
@@ -151,6 +180,20 @@ func (m *instanceDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "5":
 			m.activeTab = TabPnL
+			return m, nil
+
+		case "d":
+			// Toggle depth levels on orderbook tab
+			if m.activeTab == TabOrderbook {
+				switch m.depthLevels {
+				case 5:
+					m.depthLevels = 10
+				case 10:
+					m.depthLevels = 20
+				default:
+					m.depthLevels = 5
+				}
+			}
 			return m, nil
 
 		case "r":
@@ -195,7 +238,11 @@ func (m *instanceDetailModel) View() string {
 
 	// Help
 	b.WriteString("\n\n")
-	b.WriteString(ui.HelpStyle.Render("[←→] Switch Tab • [1-5] Jump to Tab • [R] Refresh • [Q] Back"))
+	helpText := "[←→] Switch Tab • [1-5] Jump to Tab • [R] Refresh • [Q] Back"
+	if m.activeTab == TabOrderbook {
+		helpText = "[←→] Switch Tab • [D] Toggle Depth • [R] Refresh • [Q] Back"
+	}
+	b.WriteString(ui.HelpStyle.Render(helpText))
 
 	return b.String()
 }
@@ -291,18 +338,203 @@ func (m *instanceDetailModel) renderQuickStats() string {
 }
 
 func (m *instanceDetailModel) renderPositions() string {
-	// TODO: Implement positions view
-	return ui.SubtitleStyle.Render("Positions view coming soon...")
+	var b strings.Builder
+
+	b.WriteString(ui.StrategyNameStyle.Render("POSITIONS"))
+	b.WriteString("\n\n")
+
+	if m.positions == nil || (len(m.positions.Orders) == 0 && len(m.positions.Trades) == 0) {
+		b.WriteString(ui.SubtitleStyle.Render("No active positions"))
+		return b.String()
+	}
+
+	// Show orders
+	if len(m.positions.Orders) > 0 {
+		b.WriteString(TableHeaderStyle.Render(fmt.Sprintf("  %-12s %-8s %-10s %-12s %-12s", "SYMBOL", "SIDE", "QTY", "PRICE", "STATUS")))
+		b.WriteString("\n")
+		b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(strings.Repeat("─", 60)))
+		b.WriteString("\n")
+
+		for _, order := range m.positions.Orders {
+			qty, _ := order.Quantity.Float64()
+			price, _ := order.Price.Float64()
+			sideStyle := PnLProfitStyle
+			if order.Side == connector.OrderSideSell {
+				sideStyle = PnLLossStyle
+			}
+			row := fmt.Sprintf("  %-12s %s %-10.4f %-12.2f %-12s",
+				order.Symbol,
+				sideStyle.Render(fmt.Sprintf("%-8s", order.Side)),
+				qty,
+				price,
+				order.Status,
+			)
+			b.WriteString(row)
+			b.WriteString("\n")
+		}
+	}
+
+	return b.String()
 }
 
 func (m *instanceDetailModel) renderOrderbook() string {
-	// TODO: Implement orderbook view
-	return ui.SubtitleStyle.Render("Orderbook view coming soon...")
+	var b strings.Builder
+
+	// Header
+	b.WriteString(ui.StrategyNameStyle.Render(fmt.Sprintf("ORDERBOOK - %s", m.selectedAsset)))
+	b.WriteString(ui.SubtitleStyle.Render(fmt.Sprintf("  (Depth: %d levels)", m.depthLevels)))
+	b.WriteString("\n\n")
+
+	if m.orderbook == nil {
+		b.WriteString(ui.SubtitleStyle.Render("No orderbook data available"))
+		b.WriteString("\n\n")
+		b.WriteString(ui.HelpStyle.Render("[D] Toggle Depth"))
+		return b.String()
+	}
+
+	// Calculate max quantity for bar scaling
+	maxQty := 0.0
+	for i := 0; i < m.depthLevels && i < len(m.orderbook.Asks); i++ {
+		qty, _ := m.orderbook.Asks[i].Quantity.Float64()
+		if qty > maxQty {
+			maxQty = qty
+		}
+	}
+	for i := 0; i < m.depthLevels && i < len(m.orderbook.Bids); i++ {
+		qty, _ := m.orderbook.Bids[i].Quantity.Float64()
+		if qty > maxQty {
+			maxQty = qty
+		}
+	}
+	if maxQty == 0 {
+		maxQty = 1
+	}
+
+	barWidth := 30
+	askStyle := lipgloss.NewStyle().Foreground(ui.ColorDanger)
+	bidStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess)
+
+	// Asks (reversed - lowest ask at bottom)
+	b.WriteString(askStyle.Render("                              ASKS"))
+	b.WriteString("\n")
+
+	asksToShow := m.depthLevels
+	if asksToShow > len(m.orderbook.Asks) {
+		asksToShow = len(m.orderbook.Asks)
+	}
+
+	// Show asks in reverse order (highest first)
+	for i := asksToShow - 1; i >= 0; i-- {
+		level := m.orderbook.Asks[i]
+		price, _ := level.Price.Float64()
+		qty, _ := level.Quantity.Float64()
+
+		barLen := int((qty / maxQty) * float64(barWidth))
+		if barLen < 1 {
+			barLen = 1
+		}
+
+		bar := strings.Repeat("█", barLen) + strings.Repeat("░", barWidth-barLen)
+		row := fmt.Sprintf("  %12.2f  %s  %8.4f", price, askStyle.Render(bar), qty)
+		b.WriteString(row)
+		b.WriteString("\n")
+	}
+
+	// Spread
+	if len(m.orderbook.Asks) > 0 && len(m.orderbook.Bids) > 0 {
+		bestAsk, _ := m.orderbook.Asks[0].Price.Float64()
+		bestBid, _ := m.orderbook.Bids[0].Price.Float64()
+		spread := bestAsk - bestBid
+		spreadPct := (spread / bestBid) * 100
+
+		spreadLine := fmt.Sprintf("  ──────────── SPREAD: $%.2f (%.3f%%) ────────────", spread, spreadPct)
+		b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(spreadLine))
+		b.WriteString("\n")
+	}
+
+	// Bids
+	bidsToShow := m.depthLevels
+	if bidsToShow > len(m.orderbook.Bids) {
+		bidsToShow = len(m.orderbook.Bids)
+	}
+
+	for i := 0; i < bidsToShow; i++ {
+		level := m.orderbook.Bids[i]
+		price, _ := level.Price.Float64()
+		qty, _ := level.Quantity.Float64()
+
+		barLen := int((qty / maxQty) * float64(barWidth))
+		if barLen < 1 {
+			barLen = 1
+		}
+
+		bar := strings.Repeat("█", barLen) + strings.Repeat("░", barWidth-barLen)
+		row := fmt.Sprintf("  %12.2f  %s  %8.4f", price, bidStyle.Render(bar), qty)
+		b.WriteString(row)
+		b.WriteString("\n")
+	}
+
+	b.WriteString(bidStyle.Render("                              BIDS"))
+	b.WriteString("\n\n")
+
+	// Mid price info
+	if len(m.orderbook.Asks) > 0 && len(m.orderbook.Bids) > 0 {
+		bestAsk, _ := m.orderbook.Asks[0].Price.Float64()
+		bestBid, _ := m.orderbook.Bids[0].Price.Float64()
+		midPrice := (bestAsk + bestBid) / 2
+
+		b.WriteString(fmt.Sprintf("Mid: $%.2f   Bid: $%.2f   Ask: $%.2f",
+			midPrice, bestBid, bestAsk))
+	}
+
+	return b.String()
 }
 
 func (m *instanceDetailModel) renderTrades() string {
-	// TODO: Implement trades view
-	return ui.SubtitleStyle.Render("Trades view coming soon...")
+	var b strings.Builder
+
+	b.WriteString(ui.StrategyNameStyle.Render("RECENT TRADES"))
+	b.WriteString("\n\n")
+
+	if len(m.trades) == 0 {
+		b.WriteString(ui.SubtitleStyle.Render("No trades yet"))
+		return b.String()
+	}
+
+	// Table header
+	b.WriteString(TableHeaderStyle.Render(fmt.Sprintf("  %-10s %-12s %-8s %-10s %-12s %-10s",
+		"TIME", "SYMBOL", "SIDE", "QTY", "PRICE", "FEE")))
+	b.WriteString("\n")
+	b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(strings.Repeat("─", 70)))
+	b.WriteString("\n")
+
+	for _, trade := range m.trades {
+		timeStr := trade.Timestamp.Format("15:04:05")
+		qty, _ := trade.Quantity.Float64()
+		price, _ := trade.Price.Float64()
+		fee, _ := trade.Fee.Float64()
+
+		sideStyle := PnLProfitStyle
+		if trade.Side == connector.OrderSideSell {
+			sideStyle = PnLLossStyle
+		}
+
+		row := fmt.Sprintf("  %-10s %-12s %s %-10.4f %-12.2f %-10.4f",
+			timeStr,
+			trade.Symbol,
+			sideStyle.Render(fmt.Sprintf("%-8s", trade.Side)),
+			qty,
+			price,
+			fee,
+		)
+		b.WriteString(row)
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(ui.SubtitleStyle.Render(fmt.Sprintf("Showing %d trades", len(m.trades))))
+
+	return b.String()
 }
 
 func (m *instanceDetailModel) renderPnL() string {
