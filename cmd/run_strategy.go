@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -47,17 +46,12 @@ func (rsc *RunStrategyCommand) run(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("strategy directory not found: %s", strategyDir)
 	}
 
-	// Setup signal handling for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
 		<-sigChan
 		fmt.Println("\n\n🛑 Received shutdown signal, stopping strategy...")
-		cancel()
 	}()
 
 	// Start runtime - it will load config.yml from strategy dir and exchanges.yml from project root
@@ -66,7 +60,7 @@ func (rsc *RunStrategyCommand) run(cmd *cobra.Command, _ []string) error {
 	fmt.Printf("   Path: %s\n", strategyDir)
 	fmt.Println("\nPress Ctrl+C to stop...")
 
-	if err := rsc.runtime.Run(ctx, strategyDir); err != nil {
+	if err := rsc.runtime.Run(strategyDir); err != nil {
 		return fmt.Errorf("runtime error: %w", err)
 	}
 
