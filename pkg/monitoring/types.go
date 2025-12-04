@@ -10,7 +10,18 @@ package monitoring
 
 import (
 	"time"
+
+	"github.com/backtesting-org/kronos-sdk/pkg/types/kronos/numerical"
 )
+
+// PnLView represents the PnL snapshot for a strategy
+type PnLView struct {
+	StrategyName  string            `json:"strategy_name"`
+	RealizedPnL   numerical.Decimal `json:"realized_pnl"`
+	UnrealizedPnL numerical.Decimal `json:"unrealized_pnl"`
+	TotalPnL      numerical.Decimal `json:"total_pnl"`
+	TotalFees     numerical.Decimal `json:"total_fees"`
+}
 
 // StrategyMetrics represents runtime metrics for a strategy
 type StrategyMetrics struct {

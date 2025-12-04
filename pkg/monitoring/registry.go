@@ -9,7 +9,7 @@ import (
 // ViewRegistry aggregates runtime data from SDK stores and exposes it for monitoring.
 // This interface is implemented in the SDK and used by the monitoring server.
 type ViewRegistry interface {
-	GetPnLView() interface{}
+	GetPnLView() *PnLView
 	GetPositionsView() *strategy.StrategyExecution
 	GetOrderbookView(symbol string) *connector.OrderBook
 	GetRecentTrades(limit int) []connector.Trade
@@ -21,7 +21,7 @@ type ViewRegistry interface {
 // This interface is implemented in the CLI to query remote strategy processes.
 type ViewQuerier interface {
 	// QueryPnL retrieves PnL snapshot from a running instance
-	QueryPnL(instanceID string) (interface{}, error)
+	QueryPnL(instanceID string) (*PnLView, error)
 
 	// QueryPositions retrieves active positions from a running instance
 	QueryPositions(instanceID string) (*strategy.StrategyExecution, error)

@@ -188,23 +188,23 @@ func (_c *ViewQuerier_QueryOrderbook_Call) RunAndReturn(run func(string, string)
 }
 
 // QueryPnL provides a mock function with given fields: instanceID
-func (_m *ViewQuerier) QueryPnL(instanceID string) (interface{}, error) {
+func (_m *ViewQuerier) QueryPnL(instanceID string) (*monitoring.PnLView, error) {
 	ret := _m.Called(instanceID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryPnL")
 	}
 
-	var r0 interface{}
+	var r0 *monitoring.PnLView
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (interface{}, error)); ok {
+	if rf, ok := ret.Get(0).(func(string) (*monitoring.PnLView, error)); ok {
 		return rf(instanceID)
 	}
-	if rf, ok := ret.Get(0).(func(string) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(string) *monitoring.PnLView); ok {
 		r0 = rf(instanceID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(*monitoring.PnLView)
 		}
 	}
 
@@ -235,12 +235,12 @@ func (_c *ViewQuerier_QueryPnL_Call) Run(run func(instanceID string)) *ViewQueri
 	return _c
 }
 
-func (_c *ViewQuerier_QueryPnL_Call) Return(_a0 interface{}, _a1 error) *ViewQuerier_QueryPnL_Call {
+func (_c *ViewQuerier_QueryPnL_Call) Return(_a0 *monitoring.PnLView, _a1 error) *ViewQuerier_QueryPnL_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *ViewQuerier_QueryPnL_Call) RunAndReturn(run func(string) (interface{}, error)) *ViewQuerier_QueryPnL_Call {
+func (_c *ViewQuerier_QueryPnL_Call) RunAndReturn(run func(string) (*monitoring.PnLView, error)) *ViewQuerier_QueryPnL_Call {
 	_c.Call.Return(run)
 	return _c
 }

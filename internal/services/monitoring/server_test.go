@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/backtesting-org/kronos-sdk/pkg/types/kronos/numerical"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -185,8 +186,12 @@ var _ = Describe("Server", func() {
 
 		Describe("/api/pnl", func() {
 			It("should return PnL data", func() {
-				viewRegistry.EXPECT().GetPnLView().Return(map[string]interface{}{
-					"realized": 1000.0,
+				viewRegistry.EXPECT().GetPnLView().Return(&pkgmonitoring.PnLView{
+					StrategyName:  "test-strategy",
+					RealizedPnL:   numerical.NewFromFloat(1000.0),
+					UnrealizedPnL: numerical.NewFromFloat(500.0),
+					TotalPnL:      numerical.NewFromFloat(1500.0),
+					TotalFees:     numerical.NewFromFloat(10.0),
 				})
 
 				resp, err := client.Get("http://unix/api/pnl")
@@ -195,10 +200,10 @@ var _ = Describe("Server", func() {
 
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-				var result map[string]interface{}
+				var result pkgmonitoring.PnLView
 				err = json.NewDecoder(resp.Body).Decode(&result)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(result["realized"]).To(Equal(1000.0))
+				Expect(result.StrategyName).To(Equal("test-strategy"))
 			})
 
 			It("should return empty object when nil", func() {

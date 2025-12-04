@@ -169,19 +169,19 @@ func (_c *ViewRegistry_GetOrderbookView_Call) RunAndReturn(run func(string) *con
 }
 
 // GetPnLView provides a mock function with no fields
-func (_m *ViewRegistry) GetPnLView() interface{} {
+func (_m *ViewRegistry) GetPnLView() *monitoring.PnLView {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPnLView")
 	}
 
-	var r0 interface{}
-	if rf, ok := ret.Get(0).(func() interface{}); ok {
+	var r0 *monitoring.PnLView
+	if rf, ok := ret.Get(0).(func() *monitoring.PnLView); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(*monitoring.PnLView)
 		}
 	}
 
@@ -205,12 +205,12 @@ func (_c *ViewRegistry_GetPnLView_Call) Run(run func()) *ViewRegistry_GetPnLView
 	return _c
 }
 
-func (_c *ViewRegistry_GetPnLView_Call) Return(_a0 interface{}) *ViewRegistry_GetPnLView_Call {
+func (_c *ViewRegistry_GetPnLView_Call) Return(_a0 *monitoring.PnLView) *ViewRegistry_GetPnLView_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *ViewRegistry_GetPnLView_Call) RunAndReturn(run func() interface{}) *ViewRegistry_GetPnLView_Call {
+func (_c *ViewRegistry_GetPnLView_Call) RunAndReturn(run func() *monitoring.PnLView) *ViewRegistry_GetPnLView_Call {
 	_c.Call.Return(run)
 	return _c
 }
