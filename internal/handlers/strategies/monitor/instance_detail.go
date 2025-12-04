@@ -9,7 +9,6 @@ import (
 	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/donderom/bubblon"
 )
 
 // Tab represents a detail view tab
@@ -27,13 +26,14 @@ var tabNames = []string{"Overview", "Positions", "Orderbook", "Trades", "PnL"}
 
 // instanceDetailModel shows detailed view of a single instance
 type instanceDetailModel struct {
-	querier    monitoring.ViewQuerier
-	instanceID string
-	activeTab  Tab
-	loading    bool
-	err        error
-	width      int
-	height     int
+	ui.BaseModel // Embed for common key handling
+	querier      monitoring.ViewQuerier
+	instanceID   string
+	activeTab    Tab
+	loading      bool
+	err          error
+	width        int
+	height       int
 
 	// Cached data
 	pnl       *monitoring.PnLView
@@ -46,6 +46,7 @@ type instanceDetailModel struct {
 // NewInstanceDetailModel creates a detail view for an instance
 func NewInstanceDetailModel(querier monitoring.ViewQuerier, instanceID string) tea.Model {
 	return &instanceDetailModel{
+		BaseModel:  ui.BaseModel{IsRoot: false}, // This is opened from instance list
 		querier:    querier,
 		instanceID: instanceID,
 		activeTab:  TabOverview,
@@ -117,9 +118,12 @@ func (m *instanceDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case tea.KeyMsg:
+		// Handle common keys first (ctrl+c, q, esc)
+		if handled, cmd := m.BaseModel.HandleCommonKeys(msg); handled {
+			return m, cmd
+		}
+
 		switch msg.String() {
-		case "q", "esc":
-			return m, bubblon.Close
 
 		case "left", "h":
 			if m.activeTab > 0 {

@@ -25,20 +25,22 @@ type InstanceInfo struct {
 
 // instanceListModel displays all running strategy instances
 type instanceListModel struct {
-	querier   monitoring.ViewQuerier
-	instances []InstanceInfo
-	cursor    int
-	loading   bool
-	err       error
-	width     int
-	height    int
+	ui.BaseModel // Embed for common key handling
+	querier      monitoring.ViewQuerier
+	instances    []InstanceInfo
+	cursor       int
+	loading      bool
+	err          error
+	width        int
+	height       int
 }
 
 // NewInstanceListModel creates a new instance list view
 func NewInstanceListModel(querier monitoring.ViewQuerier) tea.Model {
 	return &instanceListModel{
-		querier: querier,
-		loading: true,
+		BaseModel: ui.BaseModel{IsRoot: true}, // This is launched from main menu
+		querier:   querier,
+		loading:   true,
 	}
 }
 
@@ -132,9 +134,12 @@ func (m *instanceListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case tea.KeyMsg:
+		// Handle common keys first (ctrl+c, q, esc)
+		if handled, cmd := m.BaseModel.HandleCommonKeys(msg); handled {
+			return m, cmd
+		}
+
 		switch msg.String() {
-		case "q", "esc":
-			return m, bubblon.Close
 
 		case "up", "k":
 			if m.cursor > 0 {
