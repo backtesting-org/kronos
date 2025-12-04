@@ -15,6 +15,13 @@ type ViewRegistry interface {
 	GetRecentTrades(limit int) []connector.Trade
 	GetMetrics() *StrategyMetrics
 	GetHealth() *health.SystemHealthReport
+	GetAvailableAssets() []AssetExchange
+}
+
+// AssetExchange represents an asset on a specific exchange
+type AssetExchange struct {
+	Asset    string `json:"asset"`
+	Exchange string `json:"exchange"`
 }
 
 // ViewQuerier queries views from running strategy instances via Unix socket.
@@ -26,14 +33,17 @@ type ViewQuerier interface {
 	// QueryPositions retrieves active positions from a running instance
 	QueryPositions(instanceID string) (*strategy.StrategyExecution, error)
 
-	// QueryOrderbook retrieves orderbook for an asset from a running instance
-	QueryOrderbook(instanceID, asset string) (*connector.OrderBook, error)
+	// QueryOrderbook retrieves orderbook for an asset/exchange from a running instance
+	QueryOrderbook(instanceID, asset, exchange string) (*connector.OrderBook, error)
 
 	// QueryRecentTrades retrieves recent trades from a running instance
 	QueryRecentTrades(instanceID string, limit int) ([]connector.Trade, error)
 
 	// QueryMetrics retrieves strategy metrics from a running instance
 	QueryMetrics(instanceID string) (*StrategyMetrics, error)
+
+	// QueryAvailableAssets retrieves the list of assets being traded
+	QueryAvailableAssets(instanceID string) ([]AssetExchange, error)
 
 	// HealthCheck verifies instance is responsive
 	HealthCheck(instanceID string) error

@@ -105,14 +105,23 @@ func (q *querier) QueryPositions(instanceID string) (*strategy.StrategyExecution
 	return &result, nil
 }
 
-// QueryOrderbook retrieves orderbook for an asset from a running instance
-func (q *querier) QueryOrderbook(instanceID, asset string) (*connector.OrderBook, error) {
+// QueryOrderbook retrieves orderbook for an asset/exchange from a running instance
+func (q *querier) QueryOrderbook(instanceID, asset, exchange string) (*connector.OrderBook, error) {
 	var result connector.OrderBook
-	path := fmt.Sprintf("/api/orderbook?asset=%s", asset)
+	path := fmt.Sprintf("/api/orderbook?asset=%s&exchange=%s", asset, exchange)
 	if err := q.doRequest(instanceID, path, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
+}
+
+// QueryAvailableAssets retrieves the list of assets being traded
+func (q *querier) QueryAvailableAssets(instanceID string) ([]monitoring.AssetExchange, error) {
+	var result []monitoring.AssetExchange
+	if err := q.doRequest(instanceID, "/api/assets", &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // QueryRecentTrades retrieves recent trades from a running instance
