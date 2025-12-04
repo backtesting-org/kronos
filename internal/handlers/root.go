@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies"
+	backtesting "github.com/backtesting-org/kronos-cli/internal/handlers/strategies/backtest/types"
 	setup "github.com/backtesting-org/kronos-cli/internal/setup/types"
-	"github.com/backtesting-org/kronos-cli/internal/strategies"
-	backtesting "github.com/backtesting-org/kronos-cli/internal/strategies/backtest/types"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )

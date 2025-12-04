@@ -3,12 +3,12 @@ package app
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config"
 	"github.com/backtesting-org/kronos-cli/internal/handlers"
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies"
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/backtest"
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/live"
 	"github.com/backtesting-org/kronos-cli/internal/services/compile"
 	"github.com/backtesting-org/kronos-cli/internal/setup"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
-	"github.com/backtesting-org/kronos-cli/internal/strategies"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/backtest"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/live"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	"go.uber.org/fx"
 )

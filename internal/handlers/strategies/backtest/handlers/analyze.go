@@ -1,16 +1,16 @@
 package handlers
 
 import (
-	types2 "github.com/backtesting-org/kronos-cli/internal/strategies/backtest/types"
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/backtest/types"
 	"github.com/spf13/cobra"
 )
 
 // analyzeHandler handles the analyze command
 type analyzeHandler struct {
-	analyzeService types2.AnalyzeService
+	analyzeService types.AnalyzeService
 }
 
-func NewAnalyzeHandler(analyzeService types2.AnalyzeService) types2.AnalyzeHandler {
+func NewAnalyzeHandler(analyzeService types.AnalyzeService) types.AnalyzeHandler {
 	return &analyzeHandler{
 		analyzeService: analyzeService,
 	}

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/browse"
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/browse"
 	"github.com/backtesting-org/kronos-cli/internal/ui/router"
 	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
 	tea "github.com/charmbracelet/bubbletea"

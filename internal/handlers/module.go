@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/strategies"
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies"
 	"go.uber.org/fx"
 )
 

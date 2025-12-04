@@ -2,8 +2,8 @@ package browse
 
 import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/compile"
-	"github.com/backtesting-org/kronos-cli/internal/strategies/live"
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/compile"
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/live"
 	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
 	tea "github.com/charmbracelet/bubbletea"
 	"go.uber.org/fx"
