@@ -37,4 +37,7 @@ type ViewQuerier interface {
 
 	// HealthCheck verifies instance is responsive
 	HealthCheck(instanceID string) error
+
+	// ListInstances returns all instance IDs that have active sockets
+	ListInstances() ([]string, error)
 }

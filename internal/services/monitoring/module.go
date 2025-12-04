@@ -13,5 +13,10 @@ var Module = fx.Module("monitoring",
 			NewViewRegistry,
 			fx.As(new(monitoring.ViewRegistry)),
 		),
+		// ViewQuerier implementation - queries running instances via socket
+		fx.Annotate(
+			NewQuerier,
+			fx.As(new(monitoring.ViewQuerier)),
+		),
 	),
 )
