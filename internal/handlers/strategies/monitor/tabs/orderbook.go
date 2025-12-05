@@ -19,12 +19,12 @@ var (
 
 	// Live indicator styles
 	liveStyle = lipgloss.NewStyle().
-		Foreground(ui.ColorSuccess).
-		Bold(true)
+			Foreground(ui.ColorSuccess).
+			Bold(true)
 
 	pulseStyle = lipgloss.NewStyle().
-		Foreground(ui.ColorWarning).
-		Bold(true)
+			Foreground(ui.ColorWarning).
+			Bold(true)
 )
 
 // OrderbookModel is a tab that displays live orderbook data

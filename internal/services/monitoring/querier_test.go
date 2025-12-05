@@ -137,7 +137,7 @@ var _ = Describe("Querier", func() {
 			})
 			startMockServer(mux)
 
-			result, err := querier.QueryOrderbook(instanceID, "BTC")
+			result, err := querier.QueryOrderbook(instanceID, "BTC", "binance")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Bids).To(HaveLen(1))
 			Expect(result.Asks).To(HaveLen(1))
