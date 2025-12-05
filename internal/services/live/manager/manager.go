@@ -43,10 +43,25 @@ func (im *instanceManager) Start(ctx context.Context, strategy *strategy.Strateg
 	im.mu.Lock()
 	defer im.mu.Unlock()
 
-	// Check if already running
-	for _, inst := range im.instances {
+	// Check if already running - verify process is actually alive
+	for id, inst := range im.instances {
 		if inst.StrategyName == strategy.Name && inst.Status == live.StatusRunning {
-			return nil, fmt.Errorf("strategy '%s' already running", strategy.Name)
+			// Verify process is actually alive
+			if inst.PID > 0 {
+				process, err := os.FindProcess(inst.PID)
+				if err == nil {
+					// Try to signal with signal 0 to check if process exists
+					if err := process.Signal(syscall.Signal(0)); err == nil {
+						// Process is alive - really running
+						return nil, fmt.Errorf("strategy '%s' already running", strategy.Name)
+					}
+				}
+			}
+
+			// Process is dead - clean up the stale instance
+			im.logger.Info("Cleaning up stale instance", "strategy", strategy.Name, "id", id)
+			inst.Status = live.StatusStopped
+			delete(im.instances, id)
 		}
 	}
 

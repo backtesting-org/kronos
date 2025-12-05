@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
@@ -89,6 +90,7 @@ func (s *server) Start() error {
 	// Set up HTTP routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/shutdown", s.handleShutdown)
 	mux.HandleFunc("/api/pnl", s.handlePnL)
 	mux.HandleFunc("/api/positions", s.handlePositions)
 	mux.HandleFunc("/api/orderbook", s.handleOrderbook)
@@ -265,6 +267,27 @@ func (s *server) handleAssets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, assets)
+}
+
+func (s *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Send response before shutting down
+	s.writeJSON(w, map[string]string{"status": "shutting down"})
+
+	// Trigger graceful shutdown in a goroutine
+	// This allows the HTTP response to be sent first
+	go func() {
+		// Give a moment for the response to be sent
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Stop the server which will cause the strategy process to exit
+		_ = s.Stop(ctx)
+	}()
 }
 
 func (s *server) writeJSON(w http.ResponseWriter, data interface{}) {
