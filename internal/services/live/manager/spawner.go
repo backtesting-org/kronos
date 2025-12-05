@@ -34,11 +34,35 @@ func (ps *processSpawner) Spawn(ctx context.Context, strategy *strategy.Strategy
 		Setpgid: true,
 	}
 
-	// Set up stdout/stderr (can be redirected to files later)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Create instance log directory
+	instanceLogDir := fmt.Sprintf(".kronos/instances/%s", strategy.Name)
+	if err := os.MkdirAll(instanceLogDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create instance log directory: %w", err)
+	}
 
-	ps.logger.Info("Spawning strategy process", "strategy", strategy.Name)
+	// Redirect stdout/stderr to log files (NOT to TUI)
+	stdoutLog := fmt.Sprintf("%s/stdout.log", instanceLogDir)
+	stderrLog := fmt.Sprintf("%s/stderr.log", instanceLogDir)
+
+	stdoutFile, err := os.OpenFile(stdoutLog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stdout log: %w", err)
+	}
+
+	stderrFile, err := os.OpenFile(stderrLog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		_ = stdoutFile.Close()
+		return nil, fmt.Errorf("failed to open stderr log: %w", err)
+	}
+
+	cmd.Stdout = stdoutFile
+	cmd.Stderr = stderrFile
+
+	ps.logger.Info("Spawning strategy process",
+		"strategy", strategy.Name,
+		"stdout_log", stdoutLog,
+		"stderr_log", stderrLog,
+	)
 
 	return cmd, nil
 }

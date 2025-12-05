@@ -2,11 +2,13 @@ package live
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/services/live"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/donderom/bubblon"
 )
 
@@ -22,42 +24,52 @@ func NewLiveViewFactory(
 }
 
 type liveModel struct {
-	strategy  *strategy.Strategy
-	service   live.LiveService
-	isRunning bool
-	err       error
-	ctx       context.Context
-	cancel    context.CancelFunc
+	strategy *strategy.Strategy
+	service  live.LiveService
+	starting bool
+	started  bool
+	err      error
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 // NewLiveModel creates a live trading view
 func NewLiveModel(strat *strategy.Strategy, service live.LiveService) tea.Model {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &liveModel{
-		strategy:  strat,
-		service:   service,
-		isRunning: false,
-		ctx:       ctx,
-		cancel:    cancel,
+		strategy: strat,
+		service:  service,
+		starting: true,
+		started:  false,
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 }
 
 func (m *liveModel) Init() tea.Cmd {
 	return func() tea.Msg {
-		// Start the live trading session
+		// Spawn the live trading instance in background
+		// This will start a separate process and return immediately
 		err := m.service.ExecuteStrategy(m.ctx, m.strategy, nil)
-		return liveFinishedMsg{err: err}
+		return liveSpawnedMsg{err: err}
 	}
 }
 
 func (m *liveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case liveFinishedMsg:
+	case liveSpawnedMsg:
+		m.starting = false
 		m.err = msg.err
-		m.isRunning = false
+		if msg.err == nil {
+			m.started = true
+		}
 		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "q", "enter":
+			// User can exit immediately - instance runs in background
+			return m, bubblon.Cmd(bubblon.Close())
 		case "ctrl+c":
 			m.cancel()
 			return m, bubblon.Cmd(bubblon.Close())
@@ -67,22 +79,66 @@ func (m *liveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *liveModel) View() string {
-	var content string
-	content += ui.TitleStyle.Render(m.strategy.Name) + "\n"
-	content += ui.SubtitleStyle.Render("Live Trading") + "\n\n"
+	title := ui.TitleStyle.Render("🚀 Live Trading")
+	strategyName := ui.StrategyNameStyle.Render(m.strategy.Name)
 
-	if m.err != nil {
-		content += ui.StatusErrorStyle.Render("❌ Trading Error") + "\n\n"
-		content += ui.StatusErrorStyle.Render(m.err.Error()) + "\n"
-		content += "\n" + ui.SubtitleStyle.Render("Press Ctrl+C to go back")
+	var statusSection string
+	var helpText string
+
+	if m.starting {
+		// Still spawning the process
+		statusSection = ui.SubtitleStyle.Render("⏳ Starting live trading instance...")
+		helpText = ui.SubtitleStyle.Render("Please wait...")
+	} else if m.err != nil {
+		// Failed to spawn
+		statusIcon := ui.StatusErrorStyle.Render("❌ FAILED TO START")
+		errorMsg := ui.StatusErrorStyle.Render(fmt.Sprintf("\n%v", m.err))
+
+		statusSection = lipgloss.JoinVertical(
+			lipgloss.Left,
+			statusIcon,
+			errorMsg,
+		)
+		helpText = ui.HelpStyle.Render("Press Enter or q to return")
 	} else {
-		content += "🚀 Trading live on exchange...\n\n"
-		content += "Press Ctrl+C to stop\n"
+		// Successfully spawned - running in background
+		statusIcon := ui.StatusReadyStyle.Render("✅ INSTANCE STARTED")
+		message := ui.SubtitleStyle.Render("Strategy is now running in the background")
+
+		details := lipgloss.NewStyle().
+			Foreground(ui.ColorMuted).
+			Render(
+				"• Trading instance spawned as separate process\n" +
+					fmt.Sprintf("• Logs: .kronos/instances/%s/stdout.log\n", m.strategy.Name) +
+					"• Use 'Monitor' view to check status and metrics\n" +
+					"• Instance will continue running after CLI exits",
+			)
+
+		statusSection = lipgloss.JoinVertical(
+			lipgloss.Left,
+			statusIcon,
+			"",
+			message,
+			"",
+			details,
+		)
+		helpText = ui.HelpStyle.Render("Press Enter or q to return to menu")
 	}
+
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		"",
+		strategyName,
+		"",
+		statusSection,
+		"",
+		helpText,
+	)
 
 	return ui.BoxStyle.Render(content)
 }
 
-type liveFinishedMsg struct {
+type liveSpawnedMsg struct {
 	err error
 }
