@@ -83,13 +83,19 @@ func (r *liveRuntime) Run(strategyDir string) error {
 
 	r.logger.Info("✅ SDK startup complete")
 
-	// 5. Start monitoring server for this instance
+	// 5. Create shutdown context for graceful termination
+	ctx := context.Background()
+	shutdownCtx, shutdownCancel := context.WithCancel(ctx)
+	defer shutdownCancel()
+
+	// 6. Start monitoring server for this instance with shutdown callback
 	instanceID := strat.Name // Use strategy name as instance ID
 	monitoringServer, err := monitoring.NewServer(
 		pkgmonitoring.ServerConfig{
 			InstanceID: instanceID,
 		},
 		r.viewRegistry,
+		shutdownCancel, // Pass context cancel function for HTTP shutdown
 	)
 	if err != nil {
 		r.logger.Error("Failed to create monitoring server", "error", err)
@@ -105,25 +111,38 @@ func (r *liveRuntime) Run(strategyDir string) error {
 
 	r.logger.Info("✅ Strategy running, keeping process alive...")
 
-	// Set up signal handling for graceful shutdown
+	// 7. Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	// Block indefinitely - this child process stays alive trading
-	// Strategy execution happens in SDK's background goroutines
-	// Only exits when receiving SIGTERM (from manager.Stop()) or manual interrupt
-	sig := <-sigChan
-	r.logger.Info("Received shutdown signal", "signal", sig)
+	// 8. Block until shutdown is triggered (either by signal or HTTP /shutdown)
+	select {
+	case sig := <-sigChan:
+		r.logger.Info("Received shutdown signal", "signal", sig)
+	case <-shutdownCtx.Done():
+		r.logger.Info("Received HTTP shutdown command")
+	}
 
-	// Gracefully stop monitoring server
+	// 9. Create cleanup context with timeout for shutdown operations
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cleanupCancel()
+
+	// 10. Stop strategy FIRST (graceful SDK shutdown via live-trading)
+	r.logger.Info("Stopping strategy...")
+	if err := r.startup.Stop(); err != nil {
+		r.logger.Error("Failed to stop strategy", "error", err)
+		// Continue with cleanup even if this fails
+	}
+
+	// 11. Then stop monitoring server
 	if monitoringServer != nil {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := monitoringServer.Stop(shutdownCtx); err != nil {
+		r.logger.Info("Stopping monitoring server...")
+		if err := monitoringServer.Stop(cleanupCtx); err != nil {
 			r.logger.Error("Failed to stop monitoring server", "error", err)
 		}
 	}
 
+	r.logger.Info("✅ Shutdown complete")
 	return nil
 }
 

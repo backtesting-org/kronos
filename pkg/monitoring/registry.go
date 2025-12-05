@@ -48,6 +48,9 @@ type ViewQuerier interface {
 	// HealthCheck verifies instance is responsive
 	HealthCheck(instanceID string) error
 
+	// Shutdown sends shutdown command to instance (graceful HTTP-based shutdown)
+	Shutdown(instanceID string) error
+
 	// ListInstances returns all instance IDs that have active sockets
 	ListInstances() ([]string, error)
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
@@ -42,10 +43,23 @@ func (im *instanceManager) Start(ctx context.Context, strategy *strategy.Strateg
 	im.mu.Lock()
 	defer im.mu.Unlock()
 
-	// Check if already running
-	for _, inst := range im.instances {
+	// Check if already running - verify process is actually alive
+	for id, inst := range im.instances {
 		if inst.StrategyName == strategy.Name && inst.Status == live.StatusRunning {
-			return nil, fmt.Errorf("strategy '%s' already running", strategy.Name)
+			// Verify process is actually alive
+			if inst.PID > 0 {
+				process, err := os.FindProcess(inst.PID)
+				if err == nil {
+					// Try to signal with signal 0 to check if process exists
+					if err := process.Signal(syscall.Signal(0)); err == nil {
+						// Process is alive - really running
+						return nil, fmt.Errorf("strategy '%s' already running", strategy.Name)
+					}
+				}
+			}
+
+			inst.Status = live.StatusStopped
+			delete(im.instances, id)
 		}
 	}
 
@@ -80,7 +94,6 @@ func (im *instanceManager) Start(ctx context.Context, strategy *strategy.Strateg
 
 	// Track instance
 	im.instances[instance.ID] = instance
-	im.logger.Info("Started instance", "strategy", strategy.Name, "id", instance.ID, "pid", instance.PID)
 
 	// Monitor process in background
 	go im.monitorProcess(instance)
@@ -103,22 +116,54 @@ func (im *instanceManager) Stop(instanceID string) error {
 
 	instance.Cancel()
 
+	// Get process handle - either from Cmd (if we spawned it) or by PID (if reattached)
+	var process *os.Process
+	var err error
+
+	if instance.Cmd != nil && instance.Cmd.Process != nil {
+		// We spawned this process - use the Cmd's process handle
+		process = instance.Cmd.Process
+	} else if instance.PID > 0 {
+		// We reattached to this process - find it by PID
+		process, err = os.FindProcess(instance.PID)
+		if err != nil {
+			return fmt.Errorf("failed to find process: %w", err)
+		}
+	} else {
+		return fmt.Errorf("instance has no valid process reference")
+	}
+
 	// Send SIGTERM
-	if err := instance.Cmd.Process.Signal(os.Interrupt); err != nil {
+	if err := process.Signal(os.Interrupt); err != nil {
 		return fmt.Errorf("failed to signal process: %w", err)
 	}
 
 	// Wait for graceful exit with timeout
 	done := make(chan error, 1)
 	go func() {
-		done <- instance.Cmd.Wait()
+		if instance.Cmd != nil {
+			// If we have Cmd, use Wait() which is cleaner
+			done <- instance.Cmd.Wait()
+		} else {
+			// Otherwise poll for process exit
+			for i := 0; i < 100; i++ { // 10 seconds (100 * 100ms)
+				time.Sleep(100 * time.Millisecond)
+				// Try to signal with signal 0 to check if process exists
+				if err := process.Signal(syscall.Signal(0)); err != nil {
+					// Process is gone
+					done <- nil
+					return
+				}
+			}
+			done <- fmt.Errorf("timeout waiting for process to exit")
+		}
 	}()
 
 	select {
 	case <-time.After(10 * time.Second):
 		// Force kill if not exited
 		im.logger.Warn("Graceful stop timeout, force killing", "instance", instanceID)
-		if err := instance.Cmd.Process.Kill(); err != nil {
+		if err := process.Kill(); err != nil {
 			return fmt.Errorf("failed to kill process: %w", err)
 		}
 	case <-done:
@@ -130,9 +175,37 @@ func (im *instanceManager) Stop(instanceID string) error {
 	_ = im.saveStateLocked()
 	im.mu.Unlock()
 
-	im.logger.Info("Stopped instance", "strategy", instance.StrategyName, "id", instanceID)
-
 	return nil
+}
+
+// StopByStrategyName gracefully terminates an instance by strategy name
+func (im *instanceManager) StopByStrategyName(strategyName string) error {
+	im.mu.RLock()
+	var instanceID string
+
+	im.logger.Info("Searching for instance to stop",
+		"strategy", strategyName,
+		"total_instances", len(im.instances))
+
+	for id, inst := range im.instances {
+		im.logger.Debug("Checking instance",
+			"id", id,
+			"strategy", inst.StrategyName,
+			"status", inst.Status)
+
+		if inst.StrategyName == strategyName && inst.Status == live.StatusRunning {
+			instanceID = id
+			break
+		}
+	}
+	im.mu.RUnlock()
+
+	if instanceID == "" {
+		return fmt.Errorf("no running instance found for strategy: %s (instances in memory: %d) - try reloading instances from state",
+			strategyName, len(im.instances))
+	}
+
+	return im.Stop(instanceID)
 }
 
 // Kill forcefully terminates an instance
@@ -158,31 +231,6 @@ func (im *instanceManager) Kill(instanceID string) error {
 	im.mu.Unlock()
 
 	im.logger.Info("Killed instance", "strategy", instance.StrategyName, "id", instanceID)
-
-	return nil
-}
-
-// Restart stops and restarts an instance
-func (im *instanceManager) Restart(instanceID string) error {
-	im.mu.RLock()
-	instance, exists := im.instances[instanceID]
-	if !exists {
-		im.mu.RUnlock()
-		return fmt.Errorf("instance not found: %s", instanceID)
-	}
-	strategyName := instance.StrategyName
-	im.mu.RUnlock()
-
-	// Stop it
-	if err := im.Stop(instanceID); err != nil {
-		return err
-	}
-
-	// Get strategy
-	// TODO: Need to fetch strategy from config
-	// For now, we'll rely on the caller to handle this
-
-	im.logger.Info("Restarted instance", "strategy", strategyName, "id", instanceID)
 
 	return nil
 }
@@ -233,7 +281,6 @@ func (im *instanceManager) LoadRunning(ctx context.Context) error {
 			if err != nil {
 				instance.Status = live.StatusCrashed
 				instance.Error = "Process not found after restart"
-				im.logger.Warn("Process not found", "instance", instance.ID, "pid", instance.PID)
 				continue
 			}
 
@@ -244,7 +291,6 @@ func (im *instanceManager) LoadRunning(ctx context.Context) error {
 			im.instances[instance.ID] = instance
 
 			go im.monitorProcess(instance)
-			im.logger.Info("Reattached to running instance", "strategy", instance.StrategyName, "pid", instance.PID)
 		}
 	}
 
@@ -312,8 +358,6 @@ func (im *instanceManager) Shutdown(ctx context.Context, timeout time.Duration) 
 
 // monitorProcess monitors a running process for crashes
 func (im *instanceManager) monitorProcess(instance *live.Instance) {
-	defer im.logger.Info("Monitor stopped", "strategy", instance.StrategyName, "id", instance.ID)
-
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 

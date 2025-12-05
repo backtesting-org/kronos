@@ -41,7 +41,7 @@ var _ = Describe("Server", func() {
 
 	Describe("NewServer", func() {
 		It("should require instance ID", func() {
-			_, err := monitoring.NewServer(pkgmonitoring.ServerConfig{}, nil)
+			_, err := monitoring.NewServer(pkgmonitoring.ServerConfig{}, nil, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("instance ID"))
 		})
@@ -52,7 +52,7 @@ var _ = Describe("Server", func() {
 			server, err := monitoring.NewServer(pkgmonitoring.ServerConfig{
 				InstanceID: "test-instance",
 				SocketDir:  socketDir,
-			}, viewRegistry)
+			}, viewRegistry, nil)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(server).NotTo(BeNil())
@@ -70,7 +70,7 @@ var _ = Describe("Server", func() {
 			server, err := monitoring.NewServer(pkgmonitoring.ServerConfig{
 				InstanceID: "test-instance",
 				SocketDir:  tmpDir,
-			}, viewRegistry)
+			}, viewRegistry, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			errChan := make(chan error, 1)
@@ -98,7 +98,7 @@ var _ = Describe("Server", func() {
 			server, err := monitoring.NewServer(pkgmonitoring.ServerConfig{
 				InstanceID: "test-double-start",
 				SocketDir:  tmpDir,
-			}, viewRegistry)
+			}, viewRegistry, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			go func() { _ = server.Start() }()
@@ -127,7 +127,7 @@ var _ = Describe("Server", func() {
 			server, err = monitoring.NewServer(pkgmonitoring.ServerConfig{
 				InstanceID: "test-endpoints",
 				SocketDir:  tmpDir,
-			}, viewRegistry)
+			}, viewRegistry, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			go func() { _ = server.Start() }()

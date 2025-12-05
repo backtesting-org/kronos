@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
@@ -23,12 +24,17 @@ type server struct {
 	socketPath   string
 	listener     net.Listener
 	httpServer   *http.Server
+	shutdownFunc context.CancelFunc // Callback to trigger graceful shutdown
 	mu           sync.Mutex
 	started      bool
 }
 
 // NewServer creates a new monitoring server
-func NewServer(config monitoring.ServerConfig, viewRegistry monitoring.ViewRegistry) (monitoring.Server, error) {
+func NewServer(
+	config monitoring.ServerConfig,
+	viewRegistry monitoring.ViewRegistry,
+	shutdownFunc context.CancelFunc,
+) (monitoring.Server, error) {
 	if config.InstanceID == "" {
 		return nil, fmt.Errorf("instance ID is required")
 	}
@@ -53,6 +59,7 @@ func NewServer(config monitoring.ServerConfig, viewRegistry monitoring.ViewRegis
 		config:       config,
 		viewRegistry: viewRegistry,
 		socketPath:   socketPath,
+		shutdownFunc: shutdownFunc,
 	}, nil
 }
 
@@ -89,6 +96,7 @@ func (s *server) Start() error {
 	// Set up HTTP routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/shutdown", s.handleShutdown)
 	mux.HandleFunc("/api/pnl", s.handlePnL)
 	mux.HandleFunc("/api/positions", s.handlePositions)
 	mux.HandleFunc("/api/orderbook", s.handleOrderbook)
@@ -265,6 +273,27 @@ func (s *server) handleAssets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, assets)
+}
+
+func (s *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Send response before shutting down
+	s.writeJSON(w, map[string]string{"status": "shutting down"})
+
+	// Trigger graceful shutdown via context cancellation
+	// This will cause the main context to be cancelled, which the runtime monitors
+	// and triggers controller.Stop() with proper cleanup
+	if s.shutdownFunc != nil {
+		go func() {
+			// Give a moment for the HTTP response to be sent
+			time.Sleep(100 * time.Millisecond)
+			s.shutdownFunc() // Cancel the main context
+		}()
+	}
 }
 
 func (s *server) writeJSON(w http.ResponseWriter, data interface{}) {
