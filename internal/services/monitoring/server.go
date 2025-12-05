@@ -24,12 +24,17 @@ type server struct {
 	socketPath   string
 	listener     net.Listener
 	httpServer   *http.Server
+	shutdownFunc context.CancelFunc // Callback to trigger graceful shutdown
 	mu           sync.Mutex
 	started      bool
 }
 
 // NewServer creates a new monitoring server
-func NewServer(config monitoring.ServerConfig, viewRegistry monitoring.ViewRegistry) (monitoring.Server, error) {
+func NewServer(
+	config monitoring.ServerConfig,
+	viewRegistry monitoring.ViewRegistry,
+	shutdownFunc context.CancelFunc,
+) (monitoring.Server, error) {
 	if config.InstanceID == "" {
 		return nil, fmt.Errorf("instance ID is required")
 	}
@@ -54,6 +59,7 @@ func NewServer(config monitoring.ServerConfig, viewRegistry monitoring.ViewRegis
 		config:       config,
 		viewRegistry: viewRegistry,
 		socketPath:   socketPath,
+		shutdownFunc: shutdownFunc,
 	}, nil
 }
 
@@ -278,16 +284,16 @@ func (s *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	// Send response before shutting down
 	s.writeJSON(w, map[string]string{"status": "shutting down"})
 
-	// Trigger graceful shutdown in a goroutine
-	// This allows the HTTP response to be sent first
-	go func() {
-		// Give a moment for the response to be sent
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		// Stop the server which will cause the strategy process to exit
-		_ = s.Stop(ctx)
-	}()
+	// Trigger graceful shutdown via context cancellation
+	// This will cause the main context to be cancelled, which the runtime monitors
+	// and triggers controller.Stop() with proper cleanup
+	if s.shutdownFunc != nil {
+		go func() {
+			// Give a moment for the HTTP response to be sent
+			time.Sleep(100 * time.Millisecond)
+			s.shutdownFunc() // Cancel the main context
+		}()
+	}
 }
 
 func (s *server) writeJSON(w http.ResponseWriter, data interface{}) {
