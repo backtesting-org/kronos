@@ -97,3 +97,20 @@ func (r *viewRegistry) GetMetrics() *monitoring.StrategyMetrics {
 func (r *viewRegistry) GetHealth() *health.SystemHealthReport {
 	return r.health.GetSystemHealth()
 }
+
+func (r *viewRegistry) GetAvailableAssets() []monitoring.AssetExchange {
+	universe := r.kronos.Universe()
+	assets := universe.Assets
+	exchanges := universe.Exchanges
+
+	var result []monitoring.AssetExchange
+	for asset, _ := range assets {
+		for _, exchange := range exchanges {
+			result = append(result, monitoring.AssetExchange{
+				Asset:    asset.Symbol(),
+				Exchange: string(exchange.Name),
+			})
+		}
+	}
+	return result
+}

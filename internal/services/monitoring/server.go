@@ -94,6 +94,7 @@ func (s *server) Start() error {
 	mux.HandleFunc("/api/orderbook", s.handleOrderbook)
 	mux.HandleFunc("/api/trades", s.handleTrades)
 	mux.HandleFunc("/api/metrics", s.handleMetrics)
+	mux.HandleFunc("/api/assets", s.handleAssets)
 
 	s.httpServer = &http.Server{Handler: mux}
 	s.mu.Unlock()
@@ -250,6 +251,20 @@ func (s *server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, metrics)
+}
+
+func (s *server) handleAssets(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	assets := s.viewRegistry.GetAvailableAssets()
+	if assets == nil {
+		assets = []monitoring.AssetExchange{}
+	}
+
+	s.writeJSON(w, assets)
 }
 
 func (s *server) writeJSON(w http.ResponseWriter, data interface{}) {

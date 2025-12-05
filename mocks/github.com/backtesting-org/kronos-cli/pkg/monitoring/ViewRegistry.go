@@ -26,6 +26,53 @@ func (_m *ViewRegistry) EXPECT() *ViewRegistry_Expecter {
 	return &ViewRegistry_Expecter{mock: &_m.Mock}
 }
 
+// GetAvailableAssets provides a mock function with no fields
+func (_m *ViewRegistry) GetAvailableAssets() []monitoring.AssetExchange {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAvailableAssets")
+	}
+
+	var r0 []monitoring.AssetExchange
+	if rf, ok := ret.Get(0).(func() []monitoring.AssetExchange); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]monitoring.AssetExchange)
+		}
+	}
+
+	return r0
+}
+
+// ViewRegistry_GetAvailableAssets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAvailableAssets'
+type ViewRegistry_GetAvailableAssets_Call struct {
+	*mock.Call
+}
+
+// GetAvailableAssets is a helper method to define mock.On call
+func (_e *ViewRegistry_Expecter) GetAvailableAssets() *ViewRegistry_GetAvailableAssets_Call {
+	return &ViewRegistry_GetAvailableAssets_Call{Call: _e.mock.On("GetAvailableAssets")}
+}
+
+func (_c *ViewRegistry_GetAvailableAssets_Call) Run(run func()) *ViewRegistry_GetAvailableAssets_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *ViewRegistry_GetAvailableAssets_Call) Return(_a0 []monitoring.AssetExchange) *ViewRegistry_GetAvailableAssets_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *ViewRegistry_GetAvailableAssets_Call) RunAndReturn(run func() []monitoring.AssetExchange) *ViewRegistry_GetAvailableAssets_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetHealth provides a mock function with no fields
 func (_m *ViewRegistry) GetHealth() *health.SystemHealthReport {
 	ret := _m.Called()
