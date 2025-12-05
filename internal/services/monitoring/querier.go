@@ -158,6 +158,32 @@ func (q *querier) HealthCheck(instanceID string) error {
 	return err
 }
 
+// Shutdown sends graceful shutdown command to instance via HTTP
+func (q *querier) Shutdown(instanceID string) error {
+	client, baseURL, err := q.getClient(instanceID)
+	if err != nil {
+		return err
+	}
+
+	// Send POST to /shutdown endpoint
+	req, err := http.NewRequest(http.MethodPost, baseURL+"/shutdown", nil)
+	if err != nil {
+		return fmt.Errorf("failed to create shutdown request: %w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send shutdown command: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("shutdown command failed with status: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // ListInstances returns all instance IDs that have active sockets
 func (q *querier) ListInstances() ([]string, error) {
 	entries, err := os.ReadDir(q.socketDir)

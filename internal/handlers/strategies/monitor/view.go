@@ -1,7 +1,6 @@
 package monitor
 
 import (
-	"github.com/backtesting-org/kronos-cli/pkg/live"
 	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -10,8 +9,8 @@ import (
 type MonitorViewFactory func() tea.Model
 
 // NewMonitorViewFactory creates the factory for monitor views
-func NewMonitorViewFactory(querier monitoring.ViewQuerier, manager live.InstanceManager) MonitorViewFactory {
+func NewMonitorViewFactory(querier monitoring.ViewQuerier) MonitorViewFactory {
 	return func() tea.Model {
-		return NewInstanceListModel(querier, manager)
+		return NewInstanceListModel(querier)
 	}
 }

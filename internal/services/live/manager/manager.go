@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
@@ -103,22 +104,54 @@ func (im *instanceManager) Stop(instanceID string) error {
 
 	instance.Cancel()
 
+	// Get process handle - either from Cmd (if we spawned it) or by PID (if reattached)
+	var process *os.Process
+	var err error
+
+	if instance.Cmd != nil && instance.Cmd.Process != nil {
+		// We spawned this process - use the Cmd's process handle
+		process = instance.Cmd.Process
+	} else if instance.PID > 0 {
+		// We reattached to this process - find it by PID
+		process, err = os.FindProcess(instance.PID)
+		if err != nil {
+			return fmt.Errorf("failed to find process: %w", err)
+		}
+	} else {
+		return fmt.Errorf("instance has no valid process reference")
+	}
+
 	// Send SIGTERM
-	if err := instance.Cmd.Process.Signal(os.Interrupt); err != nil {
+	if err := process.Signal(os.Interrupt); err != nil {
 		return fmt.Errorf("failed to signal process: %w", err)
 	}
 
 	// Wait for graceful exit with timeout
 	done := make(chan error, 1)
 	go func() {
-		done <- instance.Cmd.Wait()
+		if instance.Cmd != nil {
+			// If we have Cmd, use Wait() which is cleaner
+			done <- instance.Cmd.Wait()
+		} else {
+			// Otherwise poll for process exit
+			for i := 0; i < 100; i++ { // 10 seconds (100 * 100ms)
+				time.Sleep(100 * time.Millisecond)
+				// Try to signal with signal 0 to check if process exists
+				if err := process.Signal(syscall.Signal(0)); err != nil {
+					// Process is gone
+					done <- nil
+					return
+				}
+			}
+			done <- fmt.Errorf("timeout waiting for process to exit")
+		}
 	}()
 
 	select {
 	case <-time.After(10 * time.Second):
 		// Force kill if not exited
 		im.logger.Warn("Graceful stop timeout, force killing", "instance", instanceID)
-		if err := instance.Cmd.Process.Kill(); err != nil {
+		if err := process.Kill(); err != nil {
 			return fmt.Errorf("failed to kill process: %w", err)
 		}
 	case <-done:
