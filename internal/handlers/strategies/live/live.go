@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
-	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/monitor"
+	"github.com/backtesting-org/kronos-cli/internal/router"
 	"github.com/backtesting-org/kronos-cli/internal/services/live"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,37 +18,34 @@ type LiveViewFactory func(*strategy.Strategy) tea.Model
 // NewLiveViewFactory creates the factory function for live trading views
 func NewLiveViewFactory(
 	liveService live.LiveService,
-	monitorFactory monitor.MonitorViewFactory,
 ) LiveViewFactory {
 	return func(s *strategy.Strategy) tea.Model {
-		return NewLiveModel(s, liveService, monitorFactory)
+		return NewLiveModel(s, liveService)
 	}
 }
 
 type liveModel struct {
-	strategy       *strategy.Strategy
-	service        live.LiveService
-	monitorFactory monitor.MonitorViewFactory
-	starting       bool
-	started        bool
-	err            error
-	ctx            context.Context
-	cancel         context.CancelFunc
-	cursor         int // 0 = back/ok, 1 = monitor
+	strategy *strategy.Strategy
+	service  live.LiveService
+	starting bool
+	started  bool
+	err      error
+	ctx      context.Context
+	cancel   context.CancelFunc
+	cursor   int // 0 = back/ok, 1 = monitor
 }
 
 // NewLiveModel creates a live trading view
-func NewLiveModel(strat *strategy.Strategy, service live.LiveService, monitorFactory monitor.MonitorViewFactory) tea.Model {
+func NewLiveModel(strat *strategy.Strategy, service live.LiveService) tea.Model {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &liveModel{
-		strategy:       strat,
-		service:        service,
-		monitorFactory: monitorFactory,
-		starting:       true,
-		started:        false,
-		ctx:            ctx,
-		cancel:         cancel,
-		cursor:         0,
+		strategy: strat,
+		service:  service,
+		starting: true,
+		started:  false,
+		ctx:      ctx,
+		cancel:   cancel,
+		cursor:   0,
 	}
 }
 
@@ -90,9 +87,10 @@ func (m *liveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Back to previous view
 					return m, bubblon.Cmd(bubblon.Close())
 				} else if m.cursor == 1 {
-					// Navigate to monitor view by pushing it onto the navigation stack
-					monitorView := m.monitorFactory()
-					return m, bubblon.Open(monitorView)
+					// Navigate to monitor view via router
+					return m, func() tea.Msg {
+						return router.NavigateMsg{Route: router.RouteMonitor}
+					}
 				}
 			}
 		}

@@ -41,7 +41,6 @@ func NewStrategyListViewFactory(
 // NewStrategyDetailViewFactory creates the factory function for detail views
 // All singleton dependencies are captured by the closure
 func NewStrategyDetailViewFactory(
-	compileService strategyTypes.CompileService,
 	compileFactory compile.CompileViewFactory,
 	liveFactory live.LiveViewFactory,
 ) StrategyDetailViewFactory {
