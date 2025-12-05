@@ -17,8 +17,8 @@ const (
 )
 
 var actionNames = map[ActionType]string{
-	ActionCompile:      "Compile",
 	ActionStartTrading: "Start Trading",
+	ActionCompile:      "Compile",
 }
 
 type StrategyDetailView interface {

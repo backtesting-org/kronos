@@ -6,6 +6,7 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/donderom/bubblon"
 )
 
@@ -39,19 +40,54 @@ func (m *resultModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *resultModel) View() string {
-	var content string
-	content += ui.TitleStyle.Render(m.strategy.Name) + "\n"
+	// Title
+	title := ui.TitleStyle.Render("📦 Compilation Result")
+	strategyName := ui.StrategyNameStyle.Render(m.strategy.Name)
 
+	var statusSection string
 	if m.err == nil {
-		content += ui.StatusReadyStyle.Render("✅ Compilation Successful") + "\n\n"
-		content += "Strategy has been compiled to .so plugin\n"
-		content += "Ready for backtest or live trading\n"
+		// Success
+		statusIcon := ui.StatusReadyStyle.Render("✅ SUCCESS")
+		message := ui.SubtitleStyle.Render("Strategy has been compiled successfully")
+		details := lipgloss.NewStyle().
+			Foreground(ui.ColorMuted).
+			Render("• Plugin binary created\n• Ready for backtest or live trading")
+
+		statusSection = lipgloss.JoinVertical(
+			lipgloss.Left,
+			statusIcon,
+			"",
+			message,
+			"",
+			details,
+		)
 	} else {
-		content += ui.StatusErrorStyle.Render("❌ Compilation Failed") + "\n\n"
-		content += ui.StatusErrorStyle.Render(fmt.Sprintf("Error: %v", m.err)) + "\n"
+		// Failure
+		statusIcon := ui.StatusErrorStyle.Render("❌ FAILED")
+		message := ui.SubtitleStyle.Render("Compilation encountered errors")
+		errorMsg := ui.StatusErrorStyle.Render(fmt.Sprintf("\nError:\n%v", m.err))
+
+		statusSection = lipgloss.JoinVertical(
+			lipgloss.Left,
+			statusIcon,
+			"",
+			message,
+			errorMsg,
+		)
 	}
 
-	content += "\n" + ui.SubtitleStyle.Render("Press Enter or q to go back")
+	help := ui.HelpStyle.Render("Press Enter or q to return")
+
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		"",
+		strategyName,
+		"",
+		statusSection,
+		"",
+		help,
+	)
 
 	return ui.BoxStyle.Render(content)
 }
