@@ -58,8 +58,6 @@ func (im *instanceManager) Start(ctx context.Context, strategy *strategy.Strateg
 				}
 			}
 
-			// Process is dead - clean up the stale instance
-			im.logger.Info("Cleaning up stale instance", "strategy", strategy.Name, "id", id)
 			inst.Status = live.StatusStopped
 			delete(im.instances, id)
 		}
@@ -96,7 +94,6 @@ func (im *instanceManager) Start(ctx context.Context, strategy *strategy.Strateg
 
 	// Track instance
 	im.instances[instance.ID] = instance
-	im.logger.Info("Started instance", "strategy", strategy.Name, "id", instance.ID, "pid", instance.PID)
 
 	// Monitor process in background
 	go im.monitorProcess(instance)
@@ -178,8 +175,6 @@ func (im *instanceManager) Stop(instanceID string) error {
 	_ = im.saveStateLocked()
 	im.mu.Unlock()
 
-	im.logger.Info("Stopped instance", "strategy", instance.StrategyName, "id", instanceID)
-
 	return nil
 }
 
@@ -240,31 +235,6 @@ func (im *instanceManager) Kill(instanceID string) error {
 	return nil
 }
 
-// Restart stops and restarts an instance
-func (im *instanceManager) Restart(instanceID string) error {
-	im.mu.RLock()
-	instance, exists := im.instances[instanceID]
-	if !exists {
-		im.mu.RUnlock()
-		return fmt.Errorf("instance not found: %s", instanceID)
-	}
-	strategyName := instance.StrategyName
-	im.mu.RUnlock()
-
-	// Stop it
-	if err := im.Stop(instanceID); err != nil {
-		return err
-	}
-
-	// Get strategy
-	// TODO: Need to fetch strategy from config
-	// For now, we'll rely on the caller to handle this
-
-	im.logger.Info("Restarted instance", "strategy", strategyName, "id", instanceID)
-
-	return nil
-}
-
 // Get retrieves a specific instance
 func (im *instanceManager) Get(instanceID string) (*live.Instance, error) {
 	im.mu.RLock()
@@ -311,7 +281,6 @@ func (im *instanceManager) LoadRunning(ctx context.Context) error {
 			if err != nil {
 				instance.Status = live.StatusCrashed
 				instance.Error = "Process not found after restart"
-				im.logger.Warn("Process not found", "instance", instance.ID, "pid", instance.PID)
 				continue
 			}
 
@@ -322,7 +291,6 @@ func (im *instanceManager) LoadRunning(ctx context.Context) error {
 			im.instances[instance.ID] = instance
 
 			go im.monitorProcess(instance)
-			im.logger.Info("Reattached to running instance", "strategy", instance.StrategyName, "pid", instance.PID)
 		}
 	}
 
@@ -390,8 +358,6 @@ func (im *instanceManager) Shutdown(ctx context.Context, timeout time.Duration) 
 
 // monitorProcess monitors a running process for crashes
 func (im *instanceManager) monitorProcess(instance *live.Instance) {
-	defer im.logger.Info("Monitor stopped", "strategy", instance.StrategyName, "id", instance.ID)
-
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 

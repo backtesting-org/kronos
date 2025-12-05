@@ -50,9 +50,6 @@ type InstanceManager interface {
 	// Kill forcefully terminates an instance
 	Kill(instanceID string) error
 
-	// Restart stops and restarts an instance
-	Restart(instanceID string) error
-
 	// Get retrieves a specific instance
 	Get(instanceID string) (*Instance, error)
 

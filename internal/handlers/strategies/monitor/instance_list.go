@@ -329,17 +329,20 @@ func (m *instanceListModel) renderStopConfirmation() string {
 	strategyInfo := ui.SubtitleStyle.Render(fmt.Sprintf("Strategy: %s", selected.ID))
 	warning := ui.HelpStyle.Render("This will gracefully terminate the running process.")
 
-	noButton := "[ No, Cancel ]"
-	yesButton := "[ Yes, Stop ]"
+	normalStyle := ui.SubtitleStyle
+	selectedNoStyle := ui.StrategyNameSelectedStyle
+	selectedYesStyle := ui.StatusDangerStyle
+
+	var noButton, yesButton string
 
 	if m.stopConfirmCursor == 0 {
 		// No is selected (default)
-		noButton = ui.StrategyNameSelectedStyle.Render("[ No, Cancel ]")
-		yesButton = ui.SubtitleStyle.Render(yesButton)
+		noButton = selectedNoStyle.Render("[ No, Cancel ]")
+		yesButton = normalStyle.Render("[ Yes, Stop ]")
 	} else {
 		// Yes is selected
-		noButton = ui.SubtitleStyle.Render(noButton)
-		yesButton = ui.StatusErrorStyle.Bold(true).Render("[ Yes, Stop ]")
+		noButton = normalStyle.Render("[ No, Cancel ]")
+		yesButton = selectedYesStyle.Render("[ Yes, Stop ]")
 	}
 
 	buttons := lipgloss.JoinHorizontal(lipgloss.Left, noButton, "  ", yesButton)
@@ -354,7 +357,7 @@ func (m *instanceListModel) renderStopConfirmation() string {
 		buttons,
 	)
 
-	return ui.BoxStyle.Width(60).Render(content)
+	return ui.BoxStyle.Width(80).Render(content)
 }
 
 func (m *instanceListModel) renderEmpty() string {
