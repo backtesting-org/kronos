@@ -109,26 +109,56 @@ func (m *instanceDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activeTab = TabPnL
 			return m, nil
 		}
+
+		// Forward key messages only to active tab
+		var cmd tea.Cmd
+		switch m.activeTab {
+		case TabOverview:
+			_, cmd = m.overviewTab.Update(msg)
+		case TabPositions:
+			_, cmd = m.positionsTab.Update(msg)
+		case TabOrderbook:
+			_, cmd = m.orderbookTab.Update(msg)
+		case TabTrades:
+			_, cmd = m.tradesTab.Update(msg)
+		case TabPnL:
+			_, cmd = m.pnlTab.Update(msg)
+		}
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return m, tea.Batch(cmds...)
 	}
 
-	// Forward message to active tab
+	// Forward ALL other messages (ticks, data, etc.) to ALL tabs
+	// This ensures each tab's tick cycle continues even when not active
 	var cmd tea.Cmd
-	switch m.activeTab {
-	case TabOverview:
-		_, cmd = m.overviewTab.Update(msg)
-	case TabPositions:
-		_, cmd = m.positionsTab.Update(msg)
-	case TabOrderbook:
-		_, cmd = m.orderbookTab.Update(msg)
-	case TabTrades:
-		_, cmd = m.tradesTab.Update(msg)
-	case TabPnL:
-		_, cmd = m.pnlTab.Update(msg)
-	}
+
+	_, cmd = m.overviewTab.Update(msg)
 	if cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 
+	_, cmd = m.positionsTab.Update(msg)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	_, cmd = m.orderbookTab.Update(msg)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	_, cmd = m.tradesTab.Update(msg)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	_, cmd = m.pnlTab.Update(msg)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	
 	return m, tea.Batch(cmds...)
 }
 

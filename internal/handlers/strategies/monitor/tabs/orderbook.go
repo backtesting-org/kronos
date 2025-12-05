@@ -16,6 +16,15 @@ import (
 var (
 	askStyle = lipgloss.NewStyle().Foreground(ui.ColorDanger)
 	bidStyle = lipgloss.NewStyle().Foreground(ui.ColorSuccess)
+
+	// Live indicator styles
+	liveStyle = lipgloss.NewStyle().
+		Foreground(ui.ColorSuccess).
+		Bold(true)
+
+	pulseStyle = lipgloss.NewStyle().
+		Foreground(ui.ColorWarning).
+		Bold(true)
 )
 
 // OrderbookModel is a tab that displays live orderbook data
@@ -30,6 +39,13 @@ type OrderbookModel struct {
 	// Available asset/exchange pairs
 	availableAssets []monitoring.AssetExchange
 	selectedIndex   int
+
+	// Live update tracking
+	lastUpdate  time.Time
+	updateCount int
+	showPulse   bool
+	lastBestBid float64
+	lastBestAsk float64
 }
 
 // NewOrderbookModel creates a new orderbook tab
@@ -41,6 +57,7 @@ func NewOrderbookModel(querier monitoring.ViewQuerier, instanceID string) *Order
 		loading:         true,
 		availableAssets: []monitoring.AssetExchange{},
 		selectedIndex:   0,
+		updateCount:     0,
 	}
 }
 
@@ -56,6 +73,7 @@ type orderbookAssetsMsg struct {
 }
 
 type orderbookTickMsg time.Time
+type orderbookPulseOffMsg struct{}
 
 func (m *OrderbookModel) Init() tea.Cmd {
 	return tea.Batch(
@@ -67,6 +85,12 @@ func (m *OrderbookModel) Init() tea.Cmd {
 func (m *OrderbookModel) tick() tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
 		return orderbookTickMsg(t)
+	})
+}
+
+func (m *OrderbookModel) pulseOff() tea.Cmd {
+	return tea.Tick(150*time.Millisecond, func(t time.Time) tea.Msg {
+		return orderbookPulseOffMsg{}
 	})
 }
 
@@ -94,7 +118,6 @@ func (m *OrderbookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err == nil && len(msg.assets) > 0 {
 			m.availableAssets = msg.assets
 			m.selectedIndex = 0
-			// Now fetch orderbook for first asset
 			return m, m.fetchData()
 		}
 		m.loading = false
@@ -104,9 +127,29 @@ func (m *OrderbookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case orderbookDataMsg:
 		m.loading = false
 		m.err = msg.err
-		if msg.err == nil {
+		if msg.err == nil && msg.orderbook != nil {
+			// Check if data actually changed
+			changed := m.hasDataChanged(msg.orderbook)
 			m.orderbook = msg.orderbook
+			m.lastUpdate = time.Now()
+			m.updateCount++
+
+			if changed {
+				m.showPulse = true
+				// Update last prices
+				if len(msg.orderbook.Bids) > 0 {
+					m.lastBestBid, _ = msg.orderbook.Bids[0].Price.Float64()
+				}
+				if len(msg.orderbook.Asks) > 0 {
+					m.lastBestAsk, _ = msg.orderbook.Asks[0].Price.Float64()
+				}
+				return m, m.pulseOff()
+			}
 		}
+		return m, nil
+
+	case orderbookPulseOffMsg:
+		m.showPulse = false
 		return m, nil
 
 	case orderbookTickMsg:
@@ -118,7 +161,6 @@ func (m *OrderbookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "d":
-			// Toggle depth
 			switch m.depth {
 			case 5:
 				m.depth = 10
@@ -130,17 +172,16 @@ func (m *OrderbookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "tab", "n":
-			// Next asset/exchange
 			if len(m.availableAssets) > 0 {
 				m.selectedIndex = (m.selectedIndex + 1) % len(m.availableAssets)
 				m.loading = true
 				m.orderbook = nil
+				m.updateCount = 0
 				return m, m.fetchData()
 			}
 			return m, nil
 
 		case "shift+tab", "p":
-			// Previous asset/exchange
 			if len(m.availableAssets) > 0 {
 				m.selectedIndex--
 				if m.selectedIndex < 0 {
@@ -148,6 +189,7 @@ func (m *OrderbookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.loading = true
 				m.orderbook = nil
+				m.updateCount = 0
 				return m, m.fetchData()
 			}
 			return m, nil
@@ -161,18 +203,31 @@ func (m *OrderbookModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// hasDataChanged checks if the orderbook data has meaningfully changed
+func (m *OrderbookModel) hasDataChanged(newOB *connector.OrderBook) bool {
+	if m.orderbook == nil {
+		return true
+	}
+	if len(newOB.Bids) > 0 && len(m.orderbook.Bids) > 0 {
+		newBid, _ := newOB.Bids[0].Price.Float64()
+		if newBid != m.lastBestBid {
+			return true
+		}
+	}
+	if len(newOB.Asks) > 0 && len(m.orderbook.Asks) > 0 {
+		newAsk, _ := newOB.Asks[0].Price.Float64()
+		if newAsk != m.lastBestAsk {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *OrderbookModel) View() string {
 	var b strings.Builder
 
-	// Header with asset selector
-	if len(m.availableAssets) > 0 {
-		selected := m.availableAssets[m.selectedIndex]
-		b.WriteString(ui.StrategyNameStyle.Render(fmt.Sprintf("ORDERBOOK - %s @ %s", selected.Asset, selected.Exchange)))
-		b.WriteString(ui.SubtitleStyle.Render(fmt.Sprintf("  (%d/%d)", m.selectedIndex+1, len(m.availableAssets))))
-	} else {
-		b.WriteString(ui.StrategyNameStyle.Render("ORDERBOOK"))
-	}
-	b.WriteString(ui.SubtitleStyle.Render(fmt.Sprintf("  Depth: %d", m.depth)))
+	// Header with asset selector and live indicator
+	b.WriteString(m.renderHeader())
 	b.WriteString("\n\n")
 
 	if m.loading && m.orderbook == nil && m.err == nil {
@@ -198,7 +253,55 @@ func (m *OrderbookModel) View() string {
 		return b.String()
 	}
 
-	// Calculate max quantity for bar scaling
+	// Render orderbook
+	b.WriteString(m.renderOrderbook())
+
+	b.WriteString("\n\n")
+	b.WriteString(ui.HelpStyle.Render("[Tab] Next Asset • [D] Toggle Depth"))
+
+	return b.String()
+}
+
+func (m *OrderbookModel) renderHeader() string {
+	var header strings.Builder
+
+	// Asset/exchange info
+	if len(m.availableAssets) > 0 {
+		selected := m.availableAssets[m.selectedIndex]
+		header.WriteString(ui.StrategyNameStyle.Render(fmt.Sprintf("ORDERBOOK - %s @ %s", selected.Asset, selected.Exchange)))
+		header.WriteString(ui.SubtitleStyle.Render(fmt.Sprintf("  (%d/%d)", m.selectedIndex+1, len(m.availableAssets))))
+	} else {
+		header.WriteString(ui.StrategyNameStyle.Render("ORDERBOOK"))
+	}
+
+	header.WriteString("  ")
+
+	// Live indicator with pulse
+	if m.showPulse {
+		header.WriteString(pulseStyle.Render("◉ LIVE"))
+	} else if !m.lastUpdate.IsZero() {
+		header.WriteString(liveStyle.Render("● LIVE"))
+	}
+
+	// Update stats
+	if !m.lastUpdate.IsZero() {
+		ago := time.Since(m.lastUpdate)
+		if ago < time.Second {
+			header.WriteString(ui.SubtitleStyle.Render("  <1s ago"))
+		} else {
+			header.WriteString(ui.SubtitleStyle.Render(fmt.Sprintf("  %ds ago", int(ago.Seconds()))))
+		}
+		header.WriteString(ui.SubtitleStyle.Render(fmt.Sprintf("  |  %d updates", m.updateCount)))
+	}
+
+	header.WriteString(ui.SubtitleStyle.Render(fmt.Sprintf("  |  Depth: %d", m.depth)))
+
+	return header.String()
+}
+
+func (m *OrderbookModel) renderOrderbook() string {
+	var b strings.Builder
+
 	maxQty := m.calculateMaxQuantity()
 	if maxQty == 0 {
 		maxQty = 1
@@ -206,8 +309,16 @@ func (m *OrderbookModel) View() string {
 
 	barWidth := 30
 
-	// Asks (reversed - lowest ask at bottom)
-	b.WriteString(askStyle.Render("                              ASKS"))
+	// Use pulse style for the labels if we just updated
+	currentAskStyle := askStyle
+	currentBidStyle := bidStyle
+	if m.showPulse {
+		currentAskStyle = pulseStyle
+		currentBidStyle = pulseStyle
+	}
+
+	// Asks header
+	b.WriteString(currentAskStyle.Render("                              ASKS"))
 	b.WriteString("\n")
 
 	asksToShow := m.depth
@@ -215,7 +326,6 @@ func (m *OrderbookModel) View() string {
 		asksToShow = len(m.orderbook.Asks)
 	}
 
-	// Show asks in reverse order (highest first)
 	for i := asksToShow - 1; i >= 0; i-- {
 		level := m.orderbook.Asks[i]
 		price, _ := level.Price.Float64()
@@ -256,7 +366,8 @@ func (m *OrderbookModel) View() string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString(bidStyle.Render("                              BIDS"))
+	// Bids footer
+	b.WriteString(currentBidStyle.Render("                              BIDS"))
 	b.WriteString("\n\n")
 
 	// Mid price info
@@ -268,9 +379,6 @@ func (m *OrderbookModel) View() string {
 		b.WriteString(fmt.Sprintf("Mid: $%.2f   Bid: $%.2f   Ask: $%.2f",
 			midPrice, bestBid, bestAsk))
 	}
-
-	b.WriteString("\n\n")
-	b.WriteString(ui.HelpStyle.Render("[Tab] Next Asset • [D] Toggle Depth"))
 
 	return b.String()
 }
