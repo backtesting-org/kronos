@@ -41,8 +41,11 @@ type InstanceManager interface {
 	// Start spawns a new strategy instance
 	Start(ctx context.Context, strategy *strategy.Strategy, frameworkRoot string) (*Instance, error)
 
-	// Stop gracefully terminates an instance
+	// Stop gracefully terminates an instance by ID
 	Stop(instanceID string) error
+
+	// StopByStrategyName gracefully terminates an instance by strategy name
+	StopByStrategyName(strategyName string) error
 
 	// Kill forcefully terminates an instance
 	Kill(instanceID string) error

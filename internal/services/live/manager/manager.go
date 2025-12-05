@@ -135,6 +135,36 @@ func (im *instanceManager) Stop(instanceID string) error {
 	return nil
 }
 
+// StopByStrategyName gracefully terminates an instance by strategy name
+func (im *instanceManager) StopByStrategyName(strategyName string) error {
+	im.mu.RLock()
+	var instanceID string
+
+	im.logger.Info("Searching for instance to stop",
+		"strategy", strategyName,
+		"total_instances", len(im.instances))
+
+	for id, inst := range im.instances {
+		im.logger.Debug("Checking instance",
+			"id", id,
+			"strategy", inst.StrategyName,
+			"status", inst.Status)
+
+		if inst.StrategyName == strategyName && inst.Status == live.StatusRunning {
+			instanceID = id
+			break
+		}
+	}
+	im.mu.RUnlock()
+
+	if instanceID == "" {
+		return fmt.Errorf("no running instance found for strategy: %s (instances in memory: %d) - try reloading instances from state",
+			strategyName, len(im.instances))
+	}
+
+	return im.Stop(instanceID)
+}
+
 // Kill forcefully terminates an instance
 func (im *instanceManager) Kill(instanceID string) error {
 	im.mu.Lock()

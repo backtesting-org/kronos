@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/backtesting-org/kronos-cli/pkg/live"
 	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -25,22 +26,26 @@ type InstanceInfo struct {
 
 // instanceListModel displays all running strategy instances
 type instanceListModel struct {
-	ui.BaseModel // Embed for common key handling
-	querier      monitoring.ViewQuerier
-	instances    []InstanceInfo
-	cursor       int
-	loading      bool
-	err          error
-	width        int
-	height       int
+	ui.BaseModel      // Embed for common key handling
+	querier           monitoring.ViewQuerier
+	instanceManager   live.InstanceManager
+	instances         []InstanceInfo
+	cursor            int
+	loading           bool
+	err               error
+	width             int
+	height            int
+	showStopConfirm   bool
+	stopConfirmCursor int // 0 = yes, 1 = no
 }
 
 // NewInstanceListModel creates a new instance list view
-func NewInstanceListModel(querier monitoring.ViewQuerier) tea.Model {
+func NewInstanceListModel(querier monitoring.ViewQuerier, manager live.InstanceManager) tea.Model {
 	return &instanceListModel{
-		BaseModel: ui.BaseModel{IsRoot: false}, // Let bubblon handle the stack
-		querier:   querier,
-		loading:   true,
+		BaseModel:       ui.BaseModel{IsRoot: false}, // Let bubblon handle the stack
+		querier:         querier,
+		instanceManager: manager,
+		loading:         true,
 	}
 }
 
@@ -48,6 +53,10 @@ func NewInstanceListModel(querier monitoring.ViewQuerier) tea.Model {
 type instancesLoadedMsg struct {
 	instances []InstanceInfo
 	err       error
+}
+
+type instanceStoppedMsg struct {
+	err error
 }
 
 type tickMsg time.Time
@@ -63,6 +72,13 @@ func (m *instanceListModel) tickCmd() tea.Cmd {
 	return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
+}
+
+func (m *instanceListModel) stopInstance(strategyName string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.instanceManager.StopByStrategyName(strategyName)
+		return instanceStoppedMsg{err: err}
+	}
 }
 
 func (m *instanceListModel) loadInstances() tea.Cmd {
@@ -127,6 +143,19 @@ func (m *instanceListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case instanceStoppedMsg:
+		m.showStopConfirm = false
+		if msg.err != nil {
+			// Show error but don't crash - just update error field
+			m.err = fmt.Errorf("failed to stop instance: %w", msg.err)
+			m.loading = false
+			return m, nil
+		}
+		// Refresh list after successful stop
+		m.loading = true
+		m.err = nil
+		return m, m.loadInstances()
+
 	case tickMsg:
 		return m, tea.Batch(
 			m.loadInstances(),
@@ -134,6 +163,31 @@ func (m *instanceListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case tea.KeyMsg:
+		// Handle stop confirmation dialog
+		if m.showStopConfirm {
+			switch msg.String() {
+			case "left", "h":
+				m.stopConfirmCursor = 0
+				return m, nil
+			case "right", "l":
+				m.stopConfirmCursor = 1
+				return m, nil
+			case "enter":
+				if m.stopConfirmCursor == 0 { // Yes
+					// Stop the instance
+					selected := m.instances[m.cursor]
+					return m, m.stopInstance(selected.ID)
+				}
+				// No - just close the dialog
+				m.showStopConfirm = false
+				return m, nil
+			case "q", "esc":
+				m.showStopConfirm = false
+				return m, nil
+			}
+			return m, nil
+		}
+
 		// Handle common keys first (ctrl+c, q, esc)
 		if handled, cmd := m.BaseModel.HandleCommonKeys(msg); handled {
 			return m, cmd
@@ -164,6 +218,14 @@ func (m *instanceListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			m.loading = true
 			return m, m.loadInstances()
+
+		case "s":
+			// Show stop confirmation for selected instance
+			if len(m.instances) > 0 && m.instances[m.cursor].Status != "stopped" {
+				m.showStopConfirm = true
+				m.stopConfirmCursor = 1 // Default to "No"
+			}
+			return m, nil
 		}
 	}
 
@@ -189,11 +251,62 @@ func (m *instanceListModel) View() string {
 		b.WriteString(m.renderTable())
 	}
 
+	// Show stop confirmation dialog if active
+	if m.showStopConfirm && len(m.instances) > 0 {
+		b.WriteString("\n\n")
+		b.WriteString(m.renderStopConfirmation())
+	}
+
 	// Help
 	b.WriteString("\n")
-	b.WriteString(ui.HelpStyle.Render("[↑↓] Navigate • [Enter] View Details • [R] Refresh • [Q] Back"))
+	if m.showStopConfirm {
+		b.WriteString(ui.HelpStyle.Render("[←→] Select • [Enter] Confirm • [Q/Esc] Cancel"))
+	} else {
+		// Make [S] Stop prominent in red
+		helpStyle := ui.HelpStyle
+		stopKey := ui.StatusErrorStyle.Bold(true).Render("[S]")
+		helpText := fmt.Sprintf("[↑↓] Navigate • [Enter] Details • %s Stop • [R] Refresh • [Q] Back", stopKey)
+		b.WriteString(helpStyle.Render(helpText))
+	}
 
 	return b.String()
+}
+
+func (m *instanceListModel) renderStopConfirmation() string {
+	selected := m.instances[m.cursor]
+
+	confirmTitle := ui.StatusErrorStyle.Render("⚠ Stop Strategy Instance?")
+	strategyInfo := ui.SubtitleStyle.Render(fmt.Sprintf("Strategy: %s", selected.ID))
+	warning := ui.HelpStyle.Render("This will gracefully terminate the running process.")
+
+	yesButton := "[ Yes, Stop ]"
+	noButton := "[ No, Cancel ]"
+
+	if m.stopConfirmCursor == 0 {
+		yesButton = ui.StatusErrorStyle.Bold(true).Render("[ Yes, Stop ]")
+	} else {
+		yesButton = ui.SubtitleStyle.Render(yesButton)
+	}
+
+	if m.stopConfirmCursor == 1 {
+		noButton = ui.StrategyNameSelectedStyle.Render("[ No, Cancel ]")
+	} else {
+		noButton = ui.SubtitleStyle.Render(noButton)
+	}
+
+	buttons := lipgloss.JoinHorizontal(lipgloss.Left, yesButton, "  ", noButton)
+
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		confirmTitle,
+		"",
+		strategyInfo,
+		warning,
+		"",
+		buttons,
+	)
+
+	return ui.BoxStyle.Width(60).Render(content)
 }
 
 func (m *instanceListModel) renderEmpty() string {
