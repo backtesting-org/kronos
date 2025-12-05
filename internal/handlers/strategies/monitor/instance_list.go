@@ -38,7 +38,7 @@ type instanceListModel struct {
 // NewInstanceListModel creates a new instance list view
 func NewInstanceListModel(querier monitoring.ViewQuerier) tea.Model {
 	return &instanceListModel{
-		BaseModel: ui.BaseModel{IsRoot: true}, // This is launched from main menu
+		BaseModel: ui.BaseModel{IsRoot: false}, // Let bubblon handle the stack
 		querier:   querier,
 		loading:   true,
 	}

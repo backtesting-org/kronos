@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/backtesting-org/kronos-cli/internal/router"
 	handlers2 "github.com/backtesting-org/kronos-cli/internal/setup/handlers"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -12,6 +13,7 @@ type mainMenuModel struct {
 	choices  []string
 	cursor   int
 	selected string
+	router   router.Router
 }
 
 func (m mainMenuModel) Init() tea.Cmd {
@@ -33,8 +35,20 @@ func (m mainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter":
-			m.selected = m.choices[m.cursor]
-			return m, tea.Quit
+			// Navigate using the router instead of quitting
+			switch m.choices[m.cursor] {
+			case "Strategies":
+				return m, func() tea.Msg {
+					return router.NavigateMsg{Route: router.RouteStrategyList}
+				}
+			case "Monitor":
+				return m, func() tea.Msg {
+					return router.NavigateMsg{Route: router.RouteMonitor}
+				}
+			case "Settings", "Help", "Create New Project":
+				// TODO: Register these routes when implemented
+				return m, nil
+			}
 		}
 	}
 	return m, nil
