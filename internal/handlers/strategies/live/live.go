@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
+	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/monitor"
 	"github.com/backtesting-org/kronos-cli/internal/services/live"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,32 +18,37 @@ type LiveViewFactory func(*strategy.Strategy) tea.Model
 // NewLiveViewFactory creates the factory function for live trading views
 func NewLiveViewFactory(
 	liveService live.LiveService,
+	monitorFactory monitor.MonitorViewFactory,
 ) LiveViewFactory {
 	return func(s *strategy.Strategy) tea.Model {
-		return NewLiveModel(s, liveService)
+		return NewLiveModel(s, liveService, monitorFactory)
 	}
 }
 
 type liveModel struct {
-	strategy *strategy.Strategy
-	service  live.LiveService
-	starting bool
-	started  bool
-	err      error
-	ctx      context.Context
-	cancel   context.CancelFunc
+	strategy       *strategy.Strategy
+	service        live.LiveService
+	monitorFactory monitor.MonitorViewFactory
+	starting       bool
+	started        bool
+	err            error
+	ctx            context.Context
+	cancel         context.CancelFunc
+	cursor         int // 0 = back/ok, 1 = monitor
 }
 
 // NewLiveModel creates a live trading view
-func NewLiveModel(strat *strategy.Strategy, service live.LiveService) tea.Model {
+func NewLiveModel(strat *strategy.Strategy, service live.LiveService, monitorFactory monitor.MonitorViewFactory) tea.Model {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &liveModel{
-		strategy: strat,
-		service:  service,
-		starting: true,
-		started:  false,
-		ctx:      ctx,
-		cancel:   cancel,
+		strategy:       strat,
+		service:        service,
+		monitorFactory: monitorFactory,
+		starting:       true,
+		started:        false,
+		ctx:            ctx,
+		cancel:         cancel,
+		cursor:         0,
 	}
 }
 
@@ -66,9 +72,34 @@ func (m *liveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// If successfully started, allow navigation between buttons
+		if m.started && !m.starting {
+			switch msg.String() {
+			case "up", "k", "left", "h":
+				if m.cursor > 0 {
+					m.cursor--
+				}
+				return m, nil
+			case "down", "j", "right", "l", "tab":
+				if m.cursor < 1 { // 0=Back, 1=Monitor
+					m.cursor++
+				}
+				return m, nil
+			case "enter":
+				if m.cursor == 0 {
+					// Back to previous view
+					return m, bubblon.Cmd(bubblon.Close())
+				} else if m.cursor == 1 {
+					// Navigate to monitor view by pushing it onto the navigation stack
+					monitorView := m.monitorFactory()
+					return m, bubblon.Open(monitorView)
+				}
+			}
+		}
+
+		// Common keys work regardless of state
 		switch msg.String() {
-		case "q", "enter":
-			// User can exit immediately - instance runs in background
+		case "q":
 			return m, bubblon.Cmd(bubblon.Close())
 		case "ctrl+c":
 			m.cancel()
@@ -84,6 +115,7 @@ func (m *liveModel) View() string {
 
 	var statusSection string
 	var helpText string
+	var buttons string
 
 	if m.starting {
 		// Still spawning the process
@@ -122,7 +154,31 @@ func (m *liveModel) View() string {
 			"",
 			details,
 		)
-		helpText = ui.HelpStyle.Render("Press Enter or q to return to menu")
+
+		// Render interactive buttons
+		backButton := "[ Back ]"
+		monitorButton := "[ Monitor Instance ]"
+
+		if m.cursor == 0 {
+			backButton = ui.StrategyNameSelectedStyle.Render("[ Back ]")
+		} else {
+			backButton = ui.SubtitleStyle.Render(backButton)
+		}
+
+		if m.cursor == 1 {
+			monitorButton = ui.StrategyNameSelectedStyle.Render("[ Monitor Instance ]")
+		} else {
+			monitorButton = ui.SubtitleStyle.Render(monitorButton)
+		}
+
+		buttons = lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			backButton,
+			"  ",
+			monitorButton,
+		)
+
+		helpText = ui.HelpStyle.Render("↑/↓ or tab to navigate • Enter to select • q to quit")
 	}
 
 	content := lipgloss.JoinVertical(
@@ -132,6 +188,8 @@ func (m *liveModel) View() string {
 		strategyName,
 		"",
 		statusSection,
+		"",
+		buttons,
 		"",
 		helpText,
 	)
