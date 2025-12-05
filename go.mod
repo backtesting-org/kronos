@@ -3,8 +3,8 @@ module github.com/backtesting-org/kronos-cli
 go 1.24.2
 
 require (
-	github.com/backtesting-org/kronos-sdk v0.0.3
-	github.com/backtesting-org/live-trading v0.0.0-20251204024058-580b5fedab8e
+	github.com/backtesting-org/kronos-sdk v0.0.4
+	github.com/backtesting-org/live-trading v0.0.0-20251205095530-87c5236f29ab
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be

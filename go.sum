@@ -30,10 +30,10 @@ github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiE
 github.com/aymanbagabas/go-osc52/v2 v2.0.1/go.mod h1:uYgXzlJ7ZpABp8OJ+exZzJJhRNQ2ASbcXHWsFqH8hp8=
 github.com/aymanbagabas/go-udiff v0.2.0 h1:TK0fH4MteXUDspT88n8CKzvK0X9O2xu9yQjWpi6yML8=
 github.com/aymanbagabas/go-udiff v0.2.0/go.mod h1:RE4Ex0qsGkTAJoQdQQCA0uG+nAzJO/pI/QwceO5fgrA=
-github.com/backtesting-org/kronos-sdk v0.0.3 h1:eVWMhoD/XXM6dV6o65DTXCcpZFe57RMXhwN61vFaeIY=
-github.com/backtesting-org/kronos-sdk v0.0.3/go.mod h1:QPAy4IanXp4LiOodN+8ICHzJQra76gk++RuuKkkPL1s=
-github.com/backtesting-org/live-trading v0.0.0-20251204024058-580b5fedab8e h1:lDhVO38SUVZs8rTC8RIBBpqS5ZZ72BLU9glhu85DYnk=
-github.com/backtesting-org/live-trading v0.0.0-20251204024058-580b5fedab8e/go.mod h1:fl0qDx6d8ZM2MGvzRJllCDyx0NRyYd/inq16TbNENOo=
+github.com/backtesting-org/kronos-sdk v0.0.4 h1:40twG6qWxDNdvcBj1g18jnw+wwyBo8Byq0J1/b7hGLg=
+github.com/backtesting-org/kronos-sdk v0.0.4/go.mod h1:3qP8BCU4obvgduqOBDQJy94mVQNbjUNrXSkNNe4NntI=
+github.com/backtesting-org/live-trading v0.0.0-20251205095530-87c5236f29ab h1:olMXweqzfmSqd8dkAc381UE/MP8ORniTfFdzB2+Ewqk=
+github.com/backtesting-org/live-trading v0.0.0-20251205095530-87c5236f29ab/go.mod h1:ix34j1P+7bZTO7QHbt1fxzfHFgc+EoP5M38vYVWmB5Y=
 github.com/bitly/go-simplejson v0.5.1 h1:xgwPbetQScXt1gh9BmoJ6j9JMr3TElvuIyjR8pgdoow=
 github.com/bitly/go-simplejson v0.5.1/go.mod h1:YOPVLzCfwK14b4Sff3oP1AmGhI9T9Vsg84etUnlyp+Q=
 github.com/bits-and-blooms/bitset v1.24.0 h1:H4x4TuulnokZKvHLfzVRTHJfFfnHEeSYJizujEZvmAM=
