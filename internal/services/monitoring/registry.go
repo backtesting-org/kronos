@@ -1,6 +1,8 @@
 package monitoring
 
 import (
+	"context"
+
 	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/health"
@@ -37,16 +39,17 @@ func (r *viewRegistry) getStrategyName() strategy.StrategyName {
 }
 
 func (r *viewRegistry) GetPnLView() *monitoring.PnLView {
+	ctx := context.Background()
 	name := r.getStrategyName()
 	if name == "" {
 		return nil
 	}
 
 	pnl := r.kronos.Activity().PNL()
-	realizedPnL := pnl.GetRealizedPNL(name)
-	unrealizedPnL, _ := pnl.GetUnrealizedPNL(name)
-	totalPnL, _ := pnl.GetTotalPNL()
-	totalFees := pnl.GetFeesByStrategy(name)
+	realizedPnL := pnl.GetRealizedPNL(ctx, name)
+	unrealizedPnL, _ := pnl.GetUnrealizedPNL(ctx, name)
+	totalPnL, _ := pnl.GetTotalPNL(ctx)
+	totalFees := pnl.GetFeesByStrategy(ctx, name)
 
 	return &monitoring.PnLView{
 		StrategyName:  string(name),
@@ -58,16 +61,19 @@ func (r *viewRegistry) GetPnLView() *monitoring.PnLView {
 }
 
 func (r *viewRegistry) GetPositionsView() *strategy.StrategyExecution {
+	ctx := context.Background()
 	name := r.getStrategyName()
 	if name == "" {
 		return nil
 	}
-	return r.kronos.Activity().Positions().GetStrategyExecution(name)
+	return r.kronos.Activity().Positions().GetStrategyExecution(ctx, name)
 }
 
 func (r *viewRegistry) GetOrderbookView(symbol string) *connector.OrderBook {
+	ctx := context.Background()
+
 	asset := r.kronos.Asset(symbol)
-	ob, err := r.kronos.Market().OrderBook(asset)
+	ob, err := r.kronos.Market().OrderBook(ctx, asset)
 	if err != nil {
 		return nil
 	}
@@ -75,11 +81,13 @@ func (r *viewRegistry) GetOrderbookView(symbol string) *connector.OrderBook {
 }
 
 func (r *viewRegistry) GetRecentTrades(limit int) []connector.Trade {
+	ctx := context.Background()
+
 	name := r.getStrategyName()
 	if name == "" {
 		return nil
 	}
-	trades := r.kronos.Activity().Positions().GetTradesForStrategy(name)
+	trades := r.kronos.Activity().Positions().GetTradesForStrategy(ctx, name)
 	if len(trades) <= limit {
 		return trades
 	}

@@ -149,14 +149,7 @@ func (s *liveService) ExecuteStrategy(ctx context.Context, strat *strategy.Strat
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
-
-	// 4. Start instance using manager (replaces cmd.Start())
-	s.logger.Info("Starting strategy instance via manager",
-		"strategy", strat.Name,
-		"exchanges", strat.Exchanges,
-		"framework_root", frameworkRoot,
-	)
-
+	
 	_, err = s.manager.Start(ctx, strat, frameworkRoot)
 	return err
 }
