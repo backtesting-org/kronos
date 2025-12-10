@@ -3,8 +3,8 @@ module github.com/backtesting-org/kronos-cli
 go 1.24.2
 
 require (
-	github.com/backtesting-org/kronos-sdk v0.0.4
-	github.com/backtesting-org/live-trading v0.0.0-20251205095530-87c5236f29ab
+	github.com/backtesting-org/kronos-sdk v0.0.5
+	github.com/backtesting-org/live-trading v0.0.0-20251210035222-49798e2e7a87
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be
@@ -108,7 +108,8 @@ require (
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
-	github.com/sonirico/go-hyperliquid v0.4.2 // indirect
+	github.com/sonirico/go-hyperliquid v0.5.0 // indirect
+	github.com/sonirico/vago v0.8.1 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
