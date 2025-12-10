@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/backtesting-org/kronos-sdk v0.0.5
-	github.com/backtesting-org/live-trading v0.0.0-20251209045626-57af6372f433
+	github.com/backtesting-org/live-trading v0.0.0-20251210035222-49798e2e7a87
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be

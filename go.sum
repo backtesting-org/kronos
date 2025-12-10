@@ -34,6 +34,8 @@ github.com/backtesting-org/kronos-sdk v0.0.5 h1:pu6k3IWTEW9WD0WRo23XnIK+rkViaLnc
 github.com/backtesting-org/kronos-sdk v0.0.5/go.mod h1:3qP8BCU4obvgduqOBDQJy94mVQNbjUNrXSkNNe4NntI=
 github.com/backtesting-org/live-trading v0.0.0-20251209045626-57af6372f433 h1:YLwZzb5vkm6WDUM3AaHxMgqb7CMoPCUeqTiWlvT8bZA=
 github.com/backtesting-org/live-trading v0.0.0-20251209045626-57af6372f433/go.mod h1:AJIpmA5XzmDN7psS15Drcdl0Xv3+7hr3u8zOplZG8M8=
+github.com/backtesting-org/live-trading v0.0.0-20251210035222-49798e2e7a87 h1:GJ2XojxSw4m2fP0FHzJK52oN2c+FIfuj+HFapKeVcWw=
+github.com/backtesting-org/live-trading v0.0.0-20251210035222-49798e2e7a87/go.mod h1:RN1n7AncVwUjolIlQ4XOX+gkqwChvOfmhu1nxTZBwow=
 github.com/bitly/go-simplejson v0.5.1 h1:xgwPbetQScXt1gh9BmoJ6j9JMr3TElvuIyjR8pgdoow=
 github.com/bitly/go-simplejson v0.5.1/go.mod h1:YOPVLzCfwK14b4Sff3oP1AmGhI9T9Vsg84etUnlyp+Q=
 github.com/bits-and-blooms/bitset v1.24.0 h1:H4x4TuulnokZKvHLfzVRTHJfFfnHEeSYJizujEZvmAM=
