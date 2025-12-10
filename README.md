@@ -25,7 +25,7 @@ Kronos is a **low-code algorithmic trading framework** that lets you write strat
 ✅ **Plugin-Based Strategy System** - Write strategies as Go plugins, compile once, deploy anywhere  
 ✅ **Interactive TUI** - Beautiful terminal interface for managing strategies and monitoring live trades  
 ✅ **Multi-Exchange Support** - Unified API across multiple exchanges (Hyperliquid perps stable, more coming soon)  
-✅ **Real-Time Monitoring** - Live orderbook, PnL, positions, and trade data via Unix sockets  
+✅ **Real-Time Monitoring** - Live orderbook, P&L, positions, and trade data via Unix sockets  
 ✅ **Graceful Lifecycle Management** - HTTP-based process control for reliable starts and stops  
 ✅ **Production-Ready** - Deploy strategies to live markets with confidence  
 
