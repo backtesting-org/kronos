@@ -27,9 +27,11 @@ func NewSettingsListViewFactory(
 	config settings.Configuration,
 	connectorSvc connectors.ConnectorService,
 	r router.Router,
+	formFactory ConnectorFormViewFactory,
+	deleteFactory DeleteConfirmViewFactory,
 ) SettingsListViewFactory {
 	return func() tea.Model {
-		return NewSettingsListView(config, connectorSvc, r)
+		return NewSettingsListView(config, connectorSvc, r, formFactory, deleteFactory)
 	}
 }
 

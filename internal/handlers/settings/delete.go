@@ -12,6 +12,7 @@ type DeleteConfirmModel struct {
 	config        settings.Configuration
 	router        router.Router
 	confirmed     bool
+	err           error
 }
 
 // NewDeleteConfirmView creates a new delete confirmation view
@@ -40,9 +41,12 @@ func (m *DeleteConfirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.router.Back()
 		case "y", "enter":
 			// Confirm delete
-			if err := m.config.RemoveConnector(m.connectorName); err != nil {
-				// TODO: Show error
+			if m.connectorName == "" {
 				return m, m.router.Back()
+			}
+			if err := m.config.RemoveConnector(m.connectorName); err != nil {
+				m.err = err
+				return m, nil
 			}
 			return m, m.router.Back()
 		}
@@ -53,6 +57,19 @@ func (m *DeleteConfirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *DeleteConfirmModel) View() string {
 	s := "🗑️  Delete Connector\n"
 	s += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+	if m.err != nil {
+		s += "❌ Error: " + m.err.Error() + "\n\n"
+		s += "Press 'q' or 'Esc' to go back.\n"
+		return s
+	}
+
+	if m.connectorName == "" {
+		s += "No connector selected.\n\n"
+		s += "Press 'q' or 'Esc' to go back.\n"
+		return s
+	}
+
 	s += "Are you sure you want to delete connector '" + m.connectorName + "'?\n\n"
 	s += "This action cannot be undone.\n\n"
 	s += "Press 'y' to confirm, 'n' or 'Esc' to cancel.\n"
