@@ -30,11 +30,12 @@ type ConnectorFormModel struct {
 	showingDetail bool // true = show detail view, false = show edit form
 
 	// Form field values
-	exchangeName string
-	network      string
-	enabled      bool
-	credentials  map[string]string
-	assets       []string
+	exchangeName       string
+	network            string
+	enabled            bool
+	credentials        map[string]string
+	credentialPointers map[string]*string // Pointers to actual form input values
+	assets             []string
 }
 
 // NewConnectorFormView creates a new connector form view with Huh forms
@@ -82,10 +83,21 @@ func NewConnectorFormView(
 			return m
 		}
 
+		// Validate we have required data before showing detail view
+		if m.connector.Name == "" || m.exchangeName == "" {
+			m.err = fmt.Errorf("invalid connector data")
+			return m
+		}
+
 		// Show detail view first for editing
 		m.showingDetail = true
 	} else {
-		// Adding new - go straight to form
+		// Adding new - set exchange name if provided (from list selection)
+		if connectorName != "" {
+			m.exchangeName = connectorName
+		}
+
+		// Always go to form for new connectors (never detail view)
 		m.showingDetail = false
 		m.form = m.buildForm()
 	}
@@ -97,37 +109,21 @@ func NewConnectorFormView(
 func (m *ConnectorFormModel) buildForm() *huh.Form {
 	var groups []*huh.Group
 
-	// Header
-	var headerFields []huh.Field
-	if m.isEditMode {
-		headerFields = append(headerFields,
-			huh.NewNote().
-				Title("✏️  "+m.exchangeName).
-				Description("Update API credentials"),
-		)
-	} else if m.exchangeName != "" {
-		headerFields = append(headerFields,
-			huh.NewNote().
-				Title("➕ "+m.exchangeName).
-				Description("Configure API credentials for this connector"),
-		)
-	} else {
-		// No pre-selection - show exchange dropdown
+	// If no exchange name set, show selector (this should rarely happen)
+	if m.exchangeName == "" {
 		availableExchanges := m.connectorSvc.GetAvailableConnectorNames()
 		exchangeOptions := make([]huh.Option[string], len(availableExchanges))
 		for i, ex := range availableExchanges {
 			exchangeOptions[i] = huh.NewOption(ex, ex)
 		}
 
-		headerFields = append(headerFields,
+		groups = append(groups, huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Select Exchange").
 				Options(exchangeOptions...).
 				Value(&m.exchangeName),
-		)
+		))
 	}
-
-	groups = append(groups, huh.NewGroup(headerFields...))
 
 	// Get required credential fields from SDK (e.g., hyperliquid needs "private_key" and "account_address")
 	requiredFields := m.connectorSvc.GetRequiredCredentialFields(m.exchangeName)
@@ -136,20 +132,45 @@ func (m *ConnectorFormModel) buildForm() *huh.Form {
 		requiredFields = []string{"api_key", "api_secret"}
 	}
 
-	// Build credential input fields dynamically based on what SDK requires
+	// Add title as a Note field
 	var credFields []huh.Field
 
-	for _, fieldName := range requiredFields {
-		// Initialize field value
-		fieldValue := ""
-		fieldDesc := fmt.Sprintf("Enter your %s", formatFieldName(fieldName))
+	// Title
+	titleEmoji := "➕"
+	titleText := "Add Connector"
+	if m.isEditMode {
+		titleEmoji = "✏️"
+		titleText = "Edit Connector"
+	}
 
-		// If editing, show current value masked
+	credFields = append(credFields,
+		huh.NewNote().
+			Title(fmt.Sprintf("%s  %s", titleEmoji, m.exchangeName)).
+			Description(titleText),
+	)
+
+	credentialValues := make(map[string]*string)
+
+	for _, fieldName := range requiredFields {
+		// Allocate a string pointer for this field
+		fieldValue := ""
+
+		// If editing, pre-fill with existing value
+		if m.isEditMode && len(m.credentials) > 0 {
+			if existing, exists := m.credentials[fieldName]; exists {
+				fieldValue = existing
+			}
+		}
+
+		// Store pointer to this field's value
+		credentialValues[fieldName] = &fieldValue
+
+		// Build description
+		fieldDesc := fmt.Sprintf("Enter your %s", formatFieldName(fieldName))
 		if m.isEditMode && len(m.credentials) > 0 {
 			if existing, exists := m.credentials[fieldName]; exists && len(existing) > 3 {
 				masked := existing[:3] + strings.Repeat("•", minInt(len(existing)-3, 20))
 				fieldDesc = fmt.Sprintf("Current: %s", masked)
-				fieldValue = existing
 			}
 		}
 
@@ -166,18 +187,13 @@ func (m *ConnectorFormModel) buildForm() *huh.Form {
 				Description(fieldDesc).
 				Placeholder("...").
 				EchoMode(echoMode).
-				Value(&fieldValue).
-				Validate(func(s string) error {
-					if strings.TrimSpace(s) == "" {
-						return fmt.Errorf("%s is required", fieldName)
-					}
-					return nil
-				}),
+				Value(credentialValues[fieldName]),
 		)
-
-		// Store the pointer so we can access it after completion
-		m.credentials[fieldName] = fieldValue
 	}
+
+	// After form completes, we'll copy values from credentialValues to m.credentials
+	// Store the map so we can access it in Update
+	m.credentialPointers = credentialValues
 
 	// Only show enable toggle if editing (less prominent)
 	if m.isEditMode {
@@ -236,7 +252,12 @@ func (m *ConnectorFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.err != nil {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
-			if msg.String() == "q" || msg.String() == "esc" {
+			if msg.String() == "esc" {
+				// Clear error and return to form
+				m.err = nil
+				return m, nil
+			}
+			if msg.String() == "q" {
 				return m, m.router.Back()
 			}
 		}
@@ -291,6 +312,13 @@ func (m *ConnectorFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Check if form is complete
 	if m.form.State == huh.StateCompleted {
+		// Copy values from credentialPointers to credentials map
+		for fieldName, valuePtr := range m.credentialPointers {
+			if valuePtr != nil {
+				m.credentials[fieldName] = *valuePtr
+			}
+		}
+
 		// Build connector from form values
 		m.connector = settings.Connector{
 			Name:        m.exchangeName,
@@ -302,7 +330,10 @@ func (m *ConnectorFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Save the connector
 		if err := m.saveConnector(); err != nil {
-			m.err = err
+			// Show error but allow user to go back or retry
+			m.err = fmt.Errorf("%v\n\nPress Esc to cancel or fix the values and submit again", err)
+			// Reset form state so user can edit
+			m.form.State = huh.StateNormal
 			return m, nil
 		}
 
@@ -325,6 +356,13 @@ func (m *ConnectorFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *ConnectorFormModel) saveConnector() error {
+	// Validate credentials are not empty
+	for key, value := range m.connector.Credentials {
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("credential '%s' cannot be empty", formatFieldName(key))
+		}
+	}
+
 	if m.isEditMode {
 		return m.config.UpdateConnector(m.connector)
 	}
@@ -339,7 +377,7 @@ func (m *ConnectorFormModel) View() string {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(ui.ColorDanger).
 			Padding(1, 2).
-			Render("❌ " + m.err.Error() + "\n\nPress 'q' to go back")
+			Render("❌ " + m.err.Error())
 		return errorBox
 	}
 
@@ -357,6 +395,18 @@ func (m *ConnectorFormModel) View() string {
 
 // renderDetailView shows a beautiful detail card for the connector
 func (m *ConnectorFormModel) renderDetailView() string {
+	// Guard: should never be here without a connector name
+	if m.connector.Name == "" {
+		errorBox := lipgloss.NewStyle().
+			Foreground(ui.ColorDanger).
+			Bold(true).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ui.ColorDanger).
+			Padding(1, 2).
+			Render("❌ No connector loaded\n\nPress 'q' to go back")
+		return errorBox
+	}
+
 	var content strings.Builder
 
 	// Title
