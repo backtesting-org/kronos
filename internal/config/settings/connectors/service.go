@@ -12,10 +12,12 @@ import (
 
 type ConnectorService interface {
 	FetchAvailableConnectors() []connector.ExchangeName
+	GetAvailableConnectorNames() []string
 	GetMatchingConnectors() (map[connector.ExchangeName]settings.Connector, error)
 	ValidateConnectorConfig(exchangeName connector.ExchangeName, userConnector settings.Connector) error
 	MapToSDKConfig(userConnector settings.Connector) (connector.Config, error)
 	GetConnectorConfigsForStrategy(exchangeNames []string) (map[connector.ExchangeName]connector.Config, error)
+	GetRequiredCredentialFields(exchangeName string) []string
 }
 
 type connectorService struct {
@@ -30,6 +32,16 @@ func NewConnectorService(config settings.Configuration) ConnectorService {
 
 func (c *connectorService) FetchAvailableConnectors() []connector.ExchangeName {
 	return connectors.ListAvailable()
+}
+
+// GetAvailableConnectorNames returns connector names as strings for easier use in UI
+func (c *connectorService) GetAvailableConnectorNames() []string {
+	exchanges := c.FetchAvailableConnectors()
+	names := make([]string, len(exchanges))
+	for i, ex := range exchanges {
+		names[i] = string(ex)
+	}
+	return names
 }
 
 // GetMatchingConnectors returns user-configured connectors that are also available in the SDK
@@ -229,4 +241,37 @@ func (c *connectorService) GetConnectorConfigsForStrategy(exchangeNames []string
 	}
 
 	return connectorConfigs, nil
+}
+
+// GetRequiredCredentialFields returns the credential field names required by an exchange
+// This queries the SDK to get the actual struct fields, not hardcoded values
+func (c *connectorService) GetRequiredCredentialFields(exchangeName string) []string {
+	// Get the config template from SDK
+	configTemplate := connectors.GetConfigType(connector.ExchangeName(exchangeName))
+	if configTemplate == nil {
+		return []string{}
+	}
+
+	// Use reflection to get struct field names
+	// The SDK config structs have json tags that define the credential field names
+	configBytes, err := json.Marshal(configTemplate)
+	if err != nil {
+		return []string{}
+	}
+
+	var fieldMap map[string]interface{}
+	if err := json.Unmarshal(configBytes, &fieldMap); err != nil {
+		return []string{}
+	}
+
+	// Extract field names (these are the credential keys we need)
+	fields := make([]string, 0, len(fieldMap))
+	for key := range fieldMap {
+		// Filter out non-credential fields like "network", "use_testnet"
+		if key != "network" && key != "use_testnet" {
+			fields = append(fields, key)
+		}
+	}
+
+	return fields
 }

@@ -45,7 +45,11 @@ func (m mainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, func() tea.Msg {
 					return router.NavigateMsg{Route: router.RouteMonitor}
 				}
-			case "Settings", "Help", "Create New Project":
+			case "Settings":
+				return m, func() tea.Msg {
+					return router.NavigateMsg{Route: router.RouteSettingsList}
+				}
+			case "Help", "Create New Project":
 				// TODO: Register these routes when implemented
 				return m, nil
 			}

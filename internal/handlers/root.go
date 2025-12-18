@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/backtesting-org/kronos-cli/internal/handlers/settings"
 	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies"
 	backtesting "github.com/backtesting-org/kronos-cli/internal/handlers/strategies/backtest/types"
 	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/browse"
@@ -17,13 +18,16 @@ type RootHandler interface {
 
 // RootHandler handles the root command and main menu
 type rootHandler struct {
-	strategyBrowser     strategies.StrategyBrowser
-	initHandler         setup.InitHandler
-	backtestHandler     backtesting.BacktestHandler
-	analyzeHandler      backtesting.AnalyzeHandler
-	monitorViewFactory  monitor.MonitorViewFactory
-	strategyListFactory browse.StrategyListViewFactory
-	router              router.Router
+	strategyBrowser      strategies.StrategyBrowser
+	initHandler          setup.InitHandler
+	backtestHandler      backtesting.BacktestHandler
+	analyzeHandler       backtesting.AnalyzeHandler
+	monitorViewFactory   monitor.MonitorViewFactory
+	strategyListFactory  browse.StrategyListViewFactory
+	settingsListFactory  settings.SettingsListViewFactory
+	connectorFormFactory settings.ConnectorFormViewFactory
+	deleteConfirmFactory settings.DeleteConfirmViewFactory
+	router               router.Router
 }
 
 func NewRootHandler(
@@ -33,6 +37,9 @@ func NewRootHandler(
 	analyzeHandler backtesting.AnalyzeHandler,
 	monitorViewFactory monitor.MonitorViewFactory,
 	strategyListFactory browse.StrategyListViewFactory,
+	settingsListFactory settings.SettingsListViewFactory,
+	connectorFormFactory settings.ConnectorFormViewFactory,
+	deleteConfirmFactory settings.DeleteConfirmViewFactory,
 	r router.Router,
 ) RootHandler {
 	// Register ALL routes with the router at initialization
@@ -44,14 +51,33 @@ func NewRootHandler(
 		return strategyListFactory()
 	})
 
+	r.RegisterRoute(router.RouteSettingsList, func() tea.Model {
+		return settingsListFactory()
+	})
+
+	r.RegisterRoute(router.RouteSettingsCreate, func() tea.Model {
+		return connectorFormFactory("", false)
+	})
+
+	r.RegisterRoute(router.RouteSettingsEdit, func() tea.Model {
+		return connectorFormFactory("", true)
+	})
+
+	r.RegisterRoute(router.RouteSettingsDelete, func() tea.Model {
+		return deleteConfirmFactory("")
+	})
+
 	return &rootHandler{
-		strategyBrowser:     strategyBrowser,
-		initHandler:         initHandler,
-		backtestHandler:     backtestHandler,
-		analyzeHandler:      analyzeHandler,
-		monitorViewFactory:  monitorViewFactory,
-		strategyListFactory: strategyListFactory,
-		router:              r,
+		strategyBrowser:      strategyBrowser,
+		initHandler:          initHandler,
+		backtestHandler:      backtestHandler,
+		analyzeHandler:       analyzeHandler,
+		monitorViewFactory:   monitorViewFactory,
+		strategyListFactory:  strategyListFactory,
+		settingsListFactory:  settingsListFactory,
+		connectorFormFactory: connectorFormFactory,
+		deleteConfirmFactory: deleteConfirmFactory,
+		router:               r,
 	}
 }
 
@@ -84,11 +110,4 @@ func (h *rootHandler) runMainMenu(_ *cobra.Command) error {
 	p := tea.NewProgram(h.router, tea.WithAltScreen())
 	_, err := p.Run()
 	return err
-}
-
-// handleSettings opens the settings/configuration menu
-func (h *rootHandler) handleSettings(_ *cobra.Command) error {
-	// For now, this is a placeholder that will open a settings TUI
-	// TODO: Implement settings UI to edit exchanges/connectors
-	return nil
 }

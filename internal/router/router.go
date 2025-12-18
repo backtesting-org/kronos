@@ -21,6 +21,10 @@ const (
 	RouteStrategyBacktest Route = "strategy-backtest"
 	RouteStrategyEdit     Route = "strategy-edit"
 	RouteStrategyDelete   Route = "strategy-delete"
+	RouteSettingsList     Route = "settings-list"
+	RouteSettingsEdit     Route = "settings-edit"
+	RouteSettingsCreate   Route = "settings-create"
+	RouteSettingsDelete   Route = "settings-delete"
 )
 
 // ViewFactory creates a view for a given route
