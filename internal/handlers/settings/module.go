@@ -40,9 +40,10 @@ func NewConnectorFormViewFactory(
 	config settings.Configuration,
 	connectorSvc connectors.ConnectorService,
 	r router.Router,
+	deleteFactory DeleteConfirmViewFactory,
 ) ConnectorFormViewFactory {
 	return func(connectorName string, isEdit bool) tea.Model {
-		return NewConnectorFormView(config, connectorSvc, r, connectorName, isEdit)
+		return NewConnectorFormView(config, connectorSvc, r, deleteFactory, connectorName, isEdit)
 	}
 }
 

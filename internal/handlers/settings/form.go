@@ -11,18 +11,20 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/donderom/bubblon"
 )
 
 // ConnectorFormModel represents the connector detail/edit view
 type ConnectorFormModel struct {
-	form         *huh.Form
-	connector    settings.Connector
-	config       settings.Configuration
-	connectorSvc connectors.ConnectorService
-	router       router.Router
-	isEditMode   bool
-	originalName string
-	err          error
+	form          *huh.Form
+	connector     settings.Connector
+	config        settings.Configuration
+	connectorSvc  connectors.ConnectorService
+	router        router.Router
+	deleteFactory DeleteConfirmViewFactory
+	isEditMode    bool
+	originalName  string
+	err           error
 
 	// UI state
 	showingDetail bool // true = show detail view, false = show edit form
@@ -40,17 +42,19 @@ func NewConnectorFormView(
 	config settings.Configuration,
 	connectorSvc connectors.ConnectorService,
 	r router.Router,
+	deleteFactory DeleteConfirmViewFactory,
 	connectorName string,
 	isEdit bool,
 ) tea.Model {
 	m := &ConnectorFormModel{
-		config:       config,
-		connectorSvc: connectorSvc,
-		router:       r,
-		isEditMode:   isEdit,
-		originalName: connectorName,
-		credentials:  make(map[string]string),
-		enabled:      true,
+		config:        config,
+		connectorSvc:  connectorSvc,
+		router:        r,
+		deleteFactory: deleteFactory,
+		isEditMode:    isEdit,
+		originalName:  connectorName,
+		credentials:   make(map[string]string),
+		enabled:       true,
 	}
 
 	if isEdit && connectorName != "" {
@@ -270,12 +274,9 @@ func (m *ConnectorFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Stay on detail view to see the change
 				return m, nil
 			case "d":
-				// Delete (could add confirmation)
-				if err := m.config.RemoveConnector(m.connector.Name); err != nil {
-					m.err = err
-					return m, nil
-				}
-				return m, m.router.Back()
+				// Show delete confirmation dialog
+				deleteView := m.deleteFactory(m.connector.Name)
+				return m, bubblon.Open(deleteView)
 			}
 		}
 		return m, nil
