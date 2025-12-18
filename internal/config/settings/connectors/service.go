@@ -12,6 +12,7 @@ import (
 
 type ConnectorService interface {
 	FetchAvailableConnectors() []connector.ExchangeName
+	GetAvailableConnectorNames() []string
 	GetMatchingConnectors() (map[connector.ExchangeName]settings.Connector, error)
 	ValidateConnectorConfig(exchangeName connector.ExchangeName, userConnector settings.Connector) error
 	MapToSDKConfig(userConnector settings.Connector) (connector.Config, error)
@@ -30,6 +31,16 @@ func NewConnectorService(config settings.Configuration) ConnectorService {
 
 func (c *connectorService) FetchAvailableConnectors() []connector.ExchangeName {
 	return connectors.ListAvailable()
+}
+
+// GetAvailableConnectorNames returns connector names as strings for easier use in UI
+func (c *connectorService) GetAvailableConnectorNames() []string {
+	exchanges := c.FetchAvailableConnectors()
+	names := make([]string, len(exchanges))
+	for i, ex := range exchanges {
+		names[i] = string(ex)
+	}
+	return names
 }
 
 // GetMatchingConnectors returns user-configured connectors that are also available in the SDK

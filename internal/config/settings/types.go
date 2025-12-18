@@ -4,6 +4,13 @@ type Configuration interface {
 	LoadSettings() (*Settings, error)
 	GetConnectors() ([]Connector, error)
 	GetEnabledConnectors() ([]Connector, error)
+
+	// Write operations
+	SaveSettings(settings *Settings) error
+	AddConnector(connector Connector) error
+	UpdateConnector(connector Connector) error
+	RemoveConnector(name string) error
+	EnableConnector(name string, enabled bool) error
 }
 
 // Settings represents the main settings structure

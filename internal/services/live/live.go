@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/config/settings"
+	"github.com/backtesting-org/kronos-cli/internal/config/settings/connectors"
 	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
 
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
@@ -149,7 +149,7 @@ func (s *liveService) ExecuteStrategy(ctx context.Context, strat *strategy.Strat
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
-	
+
 	_, err = s.manager.Start(ctx, strat, frameworkRoot)
 	return err
 }

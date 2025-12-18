@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/backtesting-org/kronos-cli/internal/handlers/settings"
 	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies"
 	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/monitor"
 	"go.uber.org/fx"
@@ -10,6 +11,7 @@ import (
 var Module = fx.Module("handlers",
 	// Monitor view factory
 	monitor.Module,
+	settings.Module,
 
 	fx.Provide(strategies.NewStrategyBrowser),
 	fx.Provide(NewRootHandler),

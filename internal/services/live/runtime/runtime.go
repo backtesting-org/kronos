@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/connectors"
+	"github.com/backtesting-org/kronos-cli/internal/config/settings/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/services/monitoring"
 	"github.com/backtesting-org/kronos-cli/pkg/live"
