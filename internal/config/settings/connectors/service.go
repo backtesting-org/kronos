@@ -17,6 +17,7 @@ type ConnectorService interface {
 	ValidateConnectorConfig(exchangeName connector.ExchangeName, userConnector settings.Connector) error
 	MapToSDKConfig(userConnector settings.Connector) (connector.Config, error)
 	GetConnectorConfigsForStrategy(exchangeNames []string) (map[connector.ExchangeName]connector.Config, error)
+	GetRequiredCredentialFields(exchangeName string) []string
 }
 
 type connectorService struct {
@@ -240,4 +241,37 @@ func (c *connectorService) GetConnectorConfigsForStrategy(exchangeNames []string
 	}
 
 	return connectorConfigs, nil
+}
+
+// GetRequiredCredentialFields returns the credential field names required by an exchange
+// This queries the SDK to get the actual struct fields, not hardcoded values
+func (c *connectorService) GetRequiredCredentialFields(exchangeName string) []string {
+	// Get the config template from SDK
+	configTemplate := connectors.GetConfigType(connector.ExchangeName(exchangeName))
+	if configTemplate == nil {
+		return []string{}
+	}
+
+	// Use reflection to get struct field names
+	// The SDK config structs have json tags that define the credential field names
+	configBytes, err := json.Marshal(configTemplate)
+	if err != nil {
+		return []string{}
+	}
+
+	var fieldMap map[string]interface{}
+	if err := json.Unmarshal(configBytes, &fieldMap); err != nil {
+		return []string{}
+	}
+
+	// Extract field names (these are the credential keys we need)
+	fields := make([]string, 0, len(fieldMap))
+	for key := range fieldMap {
+		// Filter out non-credential fields like "network", "use_testnet"
+		if key != "network" && key != "use_testnet" {
+			fields = append(fields, key)
+		}
+	}
+
+	return fields
 }
