@@ -7,25 +7,33 @@ import (
 	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/health"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/kronos"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/profiling"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/registry"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/strategy"
+	"go.uber.org/fx"
 )
 
 type viewRegistry struct {
 	kronos           kronos.Kronos
 	health           health.HealthStore
 	strategyRegistry registry.StrategyRegistry
+	profilingStore   profiling.ProfilingStore
 }
 
-func NewViewRegistry(
-	health health.HealthStore,
-	k kronos.Kronos,
-	strategyRegistry registry.StrategyRegistry,
-) monitoring.ViewRegistry {
+type viewRegistryParams struct {
+	fx.In
+	Health           health.HealthStore
+	Kronos           kronos.Kronos
+	StrategyRegistry registry.StrategyRegistry
+	ProfilingStore   profiling.ProfilingStore `optional:"true"`
+}
+
+func NewViewRegistry(params viewRegistryParams) monitoring.ViewRegistry {
 	return &viewRegistry{
-		health:           health,
-		kronos:           k,
-		strategyRegistry: strategyRegistry,
+		health:           params.Health,
+		kronos:           params.Kronos,
+		strategyRegistry: params.StrategyRegistry,
+		profilingStore:   params.ProfilingStore,
 	}
 }
 
@@ -121,4 +129,31 @@ func (r *viewRegistry) GetAvailableAssets() []monitoring.AssetExchange {
 		}
 	}
 	return result
+}
+
+func (r *viewRegistry) GetProfilingStats() *monitoring.ProfilingStats {
+	if r.profilingStore == nil {
+		return nil
+	}
+
+	name := r.getStrategyName()
+	if name == "" {
+		return nil
+	}
+
+	stats := r.profilingStore.GetStats(string(name))
+	return &stats
+}
+
+func (r *viewRegistry) GetRecentExecutions(limit int) []monitoring.ProfilingMetrics {
+	if r.profilingStore == nil {
+		return nil
+	}
+
+	name := r.getStrategyName()
+	if name == "" {
+		return nil
+	}
+
+	return r.profilingStore.GetRecentMetrics(string(name), limit)
 }

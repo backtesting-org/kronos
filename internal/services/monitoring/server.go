@@ -103,6 +103,8 @@ func (s *server) Start() error {
 	mux.HandleFunc("/api/trades", s.handleTrades)
 	mux.HandleFunc("/api/metrics", s.handleMetrics)
 	mux.HandleFunc("/api/assets", s.handleAssets)
+	mux.HandleFunc("/profiling/stats", s.handleProfilingStats)
+	mux.HandleFunc("/profiling/executions", s.handleProfilingExecutions)
 
 	s.httpServer = &http.Server{Handler: mux}
 	s.mu.Unlock()
@@ -273,6 +275,43 @@ func (s *server) handleAssets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, assets)
+}
+
+func (s *server) handleProfilingStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	stats := s.viewRegistry.GetProfilingStats()
+	if stats == nil {
+		s.writeJSON(w, &monitoring.ProfilingStats{})
+		return
+	}
+
+	s.writeJSON(w, stats)
+}
+
+func (s *server) handleProfilingExecutions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50 // default
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	executions := s.viewRegistry.GetRecentExecutions(limit)
+	if executions == nil {
+		executions = []monitoring.ProfilingMetrics{}
+	}
+
+	s.writeJSON(w, executions)
 }
 
 func (s *server) handleShutdown(w http.ResponseWriter, r *http.Request) {

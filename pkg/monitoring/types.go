@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/backtesting-org/kronos-sdk/pkg/types/kronos/numerical"
+	sdkprofiling "github.com/backtesting-org/kronos-sdk/pkg/types/profiling"
 )
 
 // PnLView represents the PnL snapshot for a strategy
@@ -37,3 +38,11 @@ type StrategyMetrics struct {
 	WeeklyPnL        float64       `json:"weekly_pnl"`
 	MonthlyPnL       float64       `json:"monthly_pnl"`
 }
+
+// Type aliases for SDK profiling types
+// These allow us to use SDK profiling types directly in the CLI
+type (
+	ProfilingStats           = sdkprofiling.StrategyStats
+	ProfilingMetrics         = sdkprofiling.StrategyMetrics
+	ProfilingIndicatorTiming = sdkprofiling.IndicatorTiming
+)
