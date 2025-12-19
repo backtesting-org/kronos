@@ -36,14 +36,14 @@ Kronos is a **low-code algorithmic trading framework** that lets you write strat
 ### Install via Go
 
 ```bash
-go install github.com/backtesting-org/kronos-cli@latest
+go install github.com/backtesting-org/kronos@latest
 ```
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/backtesting-org/kronos-cli
-cd kronos-cli
+git clone https://github.com/backtesting-org/kronos
+cd kronos
 go build -o kronos
 sudo mv kronos /usr/local/bin/
 ```
