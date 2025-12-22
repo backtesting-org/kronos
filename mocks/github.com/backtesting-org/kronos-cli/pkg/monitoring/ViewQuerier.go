@@ -8,6 +8,8 @@ import (
 
 	monitoring "github.com/backtesting-org/kronos-cli/pkg/monitoring"
 
+	profiling "github.com/backtesting-org/kronos-sdk/pkg/types/profiling"
+
 	strategy "github.com/backtesting-org/kronos-sdk/pkg/types/strategy"
 )
 
@@ -419,6 +421,123 @@ func (_c *ViewQuerier_QueryPositions_Call) RunAndReturn(run func(string) (*strat
 	return _c
 }
 
+// QueryProfilingStats provides a mock function with given fields: instanceID
+func (_m *ViewQuerier) QueryProfilingStats(instanceID string) (*profiling.StrategyStats, error) {
+	ret := _m.Called(instanceID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryProfilingStats")
+	}
+
+	var r0 *profiling.StrategyStats
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (*profiling.StrategyStats, error)); ok {
+		return rf(instanceID)
+	}
+	if rf, ok := ret.Get(0).(func(string) *profiling.StrategyStats); ok {
+		r0 = rf(instanceID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*profiling.StrategyStats)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(instanceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ViewQuerier_QueryProfilingStats_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryProfilingStats'
+type ViewQuerier_QueryProfilingStats_Call struct {
+	*mock.Call
+}
+
+// QueryProfilingStats is a helper method to define mock.On call
+//   - instanceID string
+func (_e *ViewQuerier_Expecter) QueryProfilingStats(instanceID interface{}) *ViewQuerier_QueryProfilingStats_Call {
+	return &ViewQuerier_QueryProfilingStats_Call{Call: _e.mock.On("QueryProfilingStats", instanceID)}
+}
+
+func (_c *ViewQuerier_QueryProfilingStats_Call) Run(run func(instanceID string)) *ViewQuerier_QueryProfilingStats_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *ViewQuerier_QueryProfilingStats_Call) Return(_a0 *profiling.StrategyStats, _a1 error) *ViewQuerier_QueryProfilingStats_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ViewQuerier_QueryProfilingStats_Call) RunAndReturn(run func(string) (*profiling.StrategyStats, error)) *ViewQuerier_QueryProfilingStats_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryRecentExecutions provides a mock function with given fields: instanceID, limit
+func (_m *ViewQuerier) QueryRecentExecutions(instanceID string, limit int) ([]profiling.StrategyMetrics, error) {
+	ret := _m.Called(instanceID, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryRecentExecutions")
+	}
+
+	var r0 []profiling.StrategyMetrics
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, int) ([]profiling.StrategyMetrics, error)); ok {
+		return rf(instanceID, limit)
+	}
+	if rf, ok := ret.Get(0).(func(string, int) []profiling.StrategyMetrics); ok {
+		r0 = rf(instanceID, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]profiling.StrategyMetrics)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, int) error); ok {
+		r1 = rf(instanceID, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ViewQuerier_QueryRecentExecutions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryRecentExecutions'
+type ViewQuerier_QueryRecentExecutions_Call struct {
+	*mock.Call
+}
+
+// QueryRecentExecutions is a helper method to define mock.On call
+//   - instanceID string
+//   - limit int
+func (_e *ViewQuerier_Expecter) QueryRecentExecutions(instanceID interface{}, limit interface{}) *ViewQuerier_QueryRecentExecutions_Call {
+	return &ViewQuerier_QueryRecentExecutions_Call{Call: _e.mock.On("QueryRecentExecutions", instanceID, limit)}
+}
+
+func (_c *ViewQuerier_QueryRecentExecutions_Call) Run(run func(instanceID string, limit int)) *ViewQuerier_QueryRecentExecutions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(int))
+	})
+	return _c
+}
+
+func (_c *ViewQuerier_QueryRecentExecutions_Call) Return(_a0 []profiling.StrategyMetrics, _a1 error) *ViewQuerier_QueryRecentExecutions_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ViewQuerier_QueryRecentExecutions_Call) RunAndReturn(run func(string, int) ([]profiling.StrategyMetrics, error)) *ViewQuerier_QueryRecentExecutions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryRecentTrades provides a mock function with given fields: instanceID, limit
 func (_m *ViewQuerier) QueryRecentTrades(instanceID string, limit int) ([]connector.Trade, error) {
 	ret := _m.Called(instanceID, limit)
@@ -474,6 +593,52 @@ func (_c *ViewQuerier_QueryRecentTrades_Call) Return(_a0 []connector.Trade, _a1 
 }
 
 func (_c *ViewQuerier_QueryRecentTrades_Call) RunAndReturn(run func(string, int) ([]connector.Trade, error)) *ViewQuerier_QueryRecentTrades_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Shutdown provides a mock function with given fields: instanceID
+func (_m *ViewQuerier) Shutdown(instanceID string) error {
+	ret := _m.Called(instanceID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Shutdown")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(instanceID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ViewQuerier_Shutdown_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Shutdown'
+type ViewQuerier_Shutdown_Call struct {
+	*mock.Call
+}
+
+// Shutdown is a helper method to define mock.On call
+//   - instanceID string
+func (_e *ViewQuerier_Expecter) Shutdown(instanceID interface{}) *ViewQuerier_Shutdown_Call {
+	return &ViewQuerier_Shutdown_Call{Call: _e.mock.On("Shutdown", instanceID)}
+}
+
+func (_c *ViewQuerier_Shutdown_Call) Run(run func(instanceID string)) *ViewQuerier_Shutdown_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *ViewQuerier_Shutdown_Call) Return(_a0 error) *ViewQuerier_Shutdown_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *ViewQuerier_Shutdown_Call) RunAndReturn(run func(string) error) *ViewQuerier_Shutdown_Call {
 	_c.Call.Return(run)
 	return _c
 }

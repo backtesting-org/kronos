@@ -16,6 +16,8 @@ type ViewRegistry interface {
 	GetMetrics() *StrategyMetrics
 	GetHealth() *health.SystemHealthReport
 	GetAvailableAssets() []AssetExchange
+	GetProfilingStats() *ProfilingStats
+	GetRecentExecutions(limit int) []ProfilingMetrics
 }
 
 // AssetExchange represents an asset on a specific exchange
@@ -53,4 +55,10 @@ type ViewQuerier interface {
 
 	// ListInstances returns all instance IDs that have active sockets
 	ListInstances() ([]string, error)
+
+	// QueryProfilingStats retrieves profiling statistics from a running instance
+	QueryProfilingStats(instanceID string) (*ProfilingStats, error)
+
+	// QueryRecentExecutions retrieves recent strategy executions with timing data
+	QueryRecentExecutions(instanceID string, limit int) ([]ProfilingMetrics, error)
 }

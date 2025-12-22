@@ -10,6 +10,8 @@ import (
 
 	monitoring "github.com/backtesting-org/kronos-cli/pkg/monitoring"
 
+	profiling "github.com/backtesting-org/kronos-sdk/pkg/types/profiling"
+
 	strategy "github.com/backtesting-org/kronos-sdk/pkg/types/strategy"
 )
 
@@ -305,6 +307,101 @@ func (_c *ViewRegistry_GetPositionsView_Call) Return(_a0 *strategy.StrategyExecu
 }
 
 func (_c *ViewRegistry_GetPositionsView_Call) RunAndReturn(run func() *strategy.StrategyExecution) *ViewRegistry_GetPositionsView_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetProfilingStats provides a mock function with no fields
+func (_m *ViewRegistry) GetProfilingStats() *profiling.StrategyStats {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProfilingStats")
+	}
+
+	var r0 *profiling.StrategyStats
+	if rf, ok := ret.Get(0).(func() *profiling.StrategyStats); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*profiling.StrategyStats)
+		}
+	}
+
+	return r0
+}
+
+// ViewRegistry_GetProfilingStats_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetProfilingStats'
+type ViewRegistry_GetProfilingStats_Call struct {
+	*mock.Call
+}
+
+// GetProfilingStats is a helper method to define mock.On call
+func (_e *ViewRegistry_Expecter) GetProfilingStats() *ViewRegistry_GetProfilingStats_Call {
+	return &ViewRegistry_GetProfilingStats_Call{Call: _e.mock.On("GetProfilingStats")}
+}
+
+func (_c *ViewRegistry_GetProfilingStats_Call) Run(run func()) *ViewRegistry_GetProfilingStats_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *ViewRegistry_GetProfilingStats_Call) Return(_a0 *profiling.StrategyStats) *ViewRegistry_GetProfilingStats_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *ViewRegistry_GetProfilingStats_Call) RunAndReturn(run func() *profiling.StrategyStats) *ViewRegistry_GetProfilingStats_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetRecentExecutions provides a mock function with given fields: limit
+func (_m *ViewRegistry) GetRecentExecutions(limit int) []profiling.StrategyMetrics {
+	ret := _m.Called(limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRecentExecutions")
+	}
+
+	var r0 []profiling.StrategyMetrics
+	if rf, ok := ret.Get(0).(func(int) []profiling.StrategyMetrics); ok {
+		r0 = rf(limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]profiling.StrategyMetrics)
+		}
+	}
+
+	return r0
+}
+
+// ViewRegistry_GetRecentExecutions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRecentExecutions'
+type ViewRegistry_GetRecentExecutions_Call struct {
+	*mock.Call
+}
+
+// GetRecentExecutions is a helper method to define mock.On call
+//   - limit int
+func (_e *ViewRegistry_Expecter) GetRecentExecutions(limit interface{}) *ViewRegistry_GetRecentExecutions_Call {
+	return &ViewRegistry_GetRecentExecutions_Call{Call: _e.mock.On("GetRecentExecutions", limit)}
+}
+
+func (_c *ViewRegistry_GetRecentExecutions_Call) Run(run func(limit int)) *ViewRegistry_GetRecentExecutions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int))
+	})
+	return _c
+}
+
+func (_c *ViewRegistry_GetRecentExecutions_Call) Return(_a0 []profiling.StrategyMetrics) *ViewRegistry_GetRecentExecutions_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *ViewRegistry_GetRecentExecutions_Call) RunAndReturn(run func(int) []profiling.StrategyMetrics) *ViewRegistry_GetRecentExecutions_Call {
 	_c.Call.Return(run)
 	return _c
 }

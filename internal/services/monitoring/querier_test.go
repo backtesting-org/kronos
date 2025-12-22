@@ -240,4 +240,49 @@ var _ = Describe("Querier", func() {
 			Expect(instances[0]).To(Equal("momentum"))
 		})
 	})
+
+	Describe("QueryProfilingStats", func() {
+		It("should return profiling stats from running instance", func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/profiling/stats", func(w http.ResponseWriter, r *http.Request) {
+				stats := pkgmonitoring.ProfilingStats{}
+				json.NewEncoder(w).Encode(stats)
+			})
+			startMockServer(mux)
+
+			result, err := querier.QueryProfilingStats(instanceID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).NotTo(BeNil())
+		})
+
+		It("should return error when instance not found", func() {
+			_, err := querier.QueryProfilingStats("nonexistent")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not found"))
+		})
+	})
+
+	Describe("QueryRecentExecutions", func() {
+		It("should return recent executions with limit parameter", func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/profiling/executions", func(w http.ResponseWriter, r *http.Request) {
+				limit := r.URL.Query().Get("limit")
+				Expect(limit).To(Equal("10"))
+
+				executions := []pkgmonitoring.ProfilingMetrics{}
+				json.NewEncoder(w).Encode(executions)
+			})
+			startMockServer(mux)
+
+			result, err := querier.QueryRecentExecutions(instanceID, 10)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).NotTo(BeNil())
+		})
+
+		It("should return error when instance not found", func() {
+			_, err := querier.QueryRecentExecutions("nonexistent", 10)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not found"))
+		})
+	})
 })

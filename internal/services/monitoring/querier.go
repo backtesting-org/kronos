@@ -204,3 +204,22 @@ func (q *querier) ListInstances() ([]string, error) {
 
 	return instances, nil
 }
+
+// QueryProfilingStats retrieves profiling statistics from a running instance
+func (q *querier) QueryProfilingStats(instanceID string) (*monitoring.ProfilingStats, error) {
+	var result monitoring.ProfilingStats
+	if err := q.doRequest(instanceID, "/profiling/stats", &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// QueryRecentExecutions retrieves recent strategy executions with timing data
+func (q *querier) QueryRecentExecutions(instanceID string, limit int) ([]monitoring.ProfilingMetrics, error) {
+	var result []monitoring.ProfilingMetrics
+	path := fmt.Sprintf("/profiling/executions?limit=%d", limit)
+	if err := q.doRequest(instanceID, path, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
