@@ -11,6 +11,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const tickFrequency = 1 * time.Second
+
 // ProfilingModel displays strategy execution profiling data
 type ProfilingModel struct {
 	querier    monitoring.ViewQuerier
@@ -54,7 +56,8 @@ func (m *ProfilingModel) Init() tea.Cmd {
 }
 
 func (m *ProfilingModel) tick() tea.Cmd {
-	return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
+
+	return tea.Tick(tickFrequency, func(t time.Time) tea.Msg {
 		return profilingTickMsg(t)
 	})
 }
@@ -99,12 +102,12 @@ func (m *ProfilingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewMode = (m.viewMode + 1) % 2
 			return m, nil
 		case "up", "k":
-			if m.cursor > 0 {
+			if len(m.executions) > 0 && m.cursor > 0 {
 				m.cursor--
 			}
 			return m, nil
 		case "down", "j":
-			if m.cursor < len(m.executions)-1 {
+			if len(m.executions) > 0 && m.cursor < len(m.executions)-1 {
 				m.cursor++
 			}
 			return m, nil
@@ -168,11 +171,11 @@ func (m *ProfilingModel) renderStats() string {
 	// Performance indicator
 	avgMs := m.stats.AvgDuration.Milliseconds()
 	var perfIndicator string
-	if avgMs < 50 {
+	if avgMs < 10 {
 		perfIndicator = ui.StatusReadyStyle.Render("🟢 Excellent")
-	} else if avgMs < 100 {
+	} else if avgMs < 50 {
 		perfIndicator = ui.StatusReadyStyle.Render("🟡 Good")
-	} else if avgMs < 500 {
+	} else if avgMs < 100 {
 		perfIndicator = "🟠 Fair"
 	} else {
 		perfIndicator = ui.StatusErrorStyle.Render("🔴 Slow")
@@ -233,8 +236,7 @@ func (m *ProfilingModel) renderExecutions() string {
 		durationStyle := lipgloss.NewStyle()
 		if exec.ExecutionTime.Milliseconds() > 100 {
 			durationStyle = durationStyle.Foreground(lipgloss.Color("208")) // Orange
-		}
-		if exec.ExecutionTime.Milliseconds() > 500 {
+		} else if exec.ExecutionTime.Milliseconds() > 500 {
 			durationStyle = durationStyle.Foreground(lipgloss.Color("196")) // Red
 		}
 
