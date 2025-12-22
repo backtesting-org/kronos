@@ -338,6 +338,60 @@ var _ = Describe("Server", func() {
 			})
 		})
 
+		Describe("/profiling/stats", func() {
+			It("should return profiling stats", func() {
+				viewRegistry.EXPECT().GetProfilingStats().Return(&pkgmonitoring.ProfilingStats{})
+
+				resp, err := client.Get("http://unix/profiling/stats")
+				Expect(err).NotTo(HaveOccurred())
+				defer resp.Body.Close()
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
+
+			It("should return empty object when nil", func() {
+				viewRegistry.EXPECT().GetProfilingStats().Return(nil)
+
+				resp, err := client.Get("http://unix/profiling/stats")
+				Expect(err).NotTo(HaveOccurred())
+				defer resp.Body.Close()
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
+		})
+
+		Describe("/profiling/executions", func() {
+			It("should return executions with default limit", func() {
+				viewRegistry.EXPECT().GetRecentExecutions(50).Return([]pkgmonitoring.ProfilingMetrics{})
+
+				resp, err := client.Get("http://unix/profiling/executions")
+				Expect(err).NotTo(HaveOccurred())
+				defer resp.Body.Close()
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
+
+			It("should respect limit parameter", func() {
+				viewRegistry.EXPECT().GetRecentExecutions(10).Return([]pkgmonitoring.ProfilingMetrics{})
+
+				resp, err := client.Get("http://unix/profiling/executions?limit=10")
+				Expect(err).NotTo(HaveOccurred())
+				defer resp.Body.Close()
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
+
+			It("should return empty array when nil", func() {
+				viewRegistry.EXPECT().GetRecentExecutions(50).Return(nil)
+
+				resp, err := client.Get("http://unix/profiling/executions")
+				Expect(err).NotTo(HaveOccurred())
+				defer resp.Body.Close()
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
+		})
+
 		Describe("Method not allowed", func() {
 			DescribeTable("should reject POST requests",
 				func(endpoint string) {

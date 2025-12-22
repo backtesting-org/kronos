@@ -10,7 +10,6 @@ import (
 	"github.com/backtesting-org/kronos-sdk/pkg/types/profiling"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/registry"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/strategy"
-	"go.uber.org/fx"
 )
 
 type viewRegistry struct {
@@ -20,20 +19,17 @@ type viewRegistry struct {
 	profilingStore   profiling.ProfilingStore
 }
 
-type viewRegistryParams struct {
-	fx.In
-	Health           health.HealthStore
-	Kronos           kronos.Kronos
-	StrategyRegistry registry.StrategyRegistry
-	ProfilingStore   profiling.ProfilingStore `optional:"true"`
-}
-
-func NewViewRegistry(params viewRegistryParams) monitoring.ViewRegistry {
+func NewViewRegistry(
+	health health.HealthStore,
+	kronos kronos.Kronos,
+	strategyRegistry registry.StrategyRegistry,
+	profilingStore profiling.ProfilingStore,
+) monitoring.ViewRegistry {
 	return &viewRegistry{
-		health:           params.Health,
-		kronos:           params.Kronos,
-		strategyRegistry: params.StrategyRegistry,
-		profilingStore:   params.ProfilingStore,
+		health:           health,
+		kronos:           kronos,
+		strategyRegistry: strategyRegistry,
+		profilingStore:   profilingStore,
 	}
 }
 
