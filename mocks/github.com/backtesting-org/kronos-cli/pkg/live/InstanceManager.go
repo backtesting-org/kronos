@@ -234,52 +234,6 @@ func (_c *InstanceManager_LoadRunning_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
-// Restart provides a mock function with given fields: instanceID
-func (_m *InstanceManager) Restart(instanceID string) error {
-	ret := _m.Called(instanceID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Restart")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(instanceID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// InstanceManager_Restart_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Restart'
-type InstanceManager_Restart_Call struct {
-	*mock.Call
-}
-
-// Restart is a helper method to define mock.On call
-//   - instanceID string
-func (_e *InstanceManager_Expecter) Restart(instanceID interface{}) *InstanceManager_Restart_Call {
-	return &InstanceManager_Restart_Call{Call: _e.mock.On("Restart", instanceID)}
-}
-
-func (_c *InstanceManager_Restart_Call) Run(run func(instanceID string)) *InstanceManager_Restart_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
-	})
-	return _c
-}
-
-func (_c *InstanceManager_Restart_Call) Return(_a0 error) *InstanceManager_Restart_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *InstanceManager_Restart_Call) RunAndReturn(run func(string) error) *InstanceManager_Restart_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // SaveState provides a mock function with no fields
 func (_m *InstanceManager) SaveState() error {
 	ret := _m.Called()
@@ -474,6 +428,52 @@ func (_c *InstanceManager_Stop_Call) Return(_a0 error) *InstanceManager_Stop_Cal
 }
 
 func (_c *InstanceManager_Stop_Call) RunAndReturn(run func(string) error) *InstanceManager_Stop_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StopByStrategyName provides a mock function with given fields: strategyName
+func (_m *InstanceManager) StopByStrategyName(strategyName string) error {
+	ret := _m.Called(strategyName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopByStrategyName")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(strategyName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// InstanceManager_StopByStrategyName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopByStrategyName'
+type InstanceManager_StopByStrategyName_Call struct {
+	*mock.Call
+}
+
+// StopByStrategyName is a helper method to define mock.On call
+//   - strategyName string
+func (_e *InstanceManager_Expecter) StopByStrategyName(strategyName interface{}) *InstanceManager_StopByStrategyName_Call {
+	return &InstanceManager_StopByStrategyName_Call{Call: _e.mock.On("StopByStrategyName", strategyName)}
+}
+
+func (_c *InstanceManager_StopByStrategyName_Call) Run(run func(strategyName string)) *InstanceManager_StopByStrategyName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *InstanceManager_StopByStrategyName_Call) Return(_a0 error) *InstanceManager_StopByStrategyName_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *InstanceManager_StopByStrategyName_Call) RunAndReturn(run func(string) error) *InstanceManager_StopByStrategyName_Call {
 	_c.Call.Return(run)
 	return _c
 }
