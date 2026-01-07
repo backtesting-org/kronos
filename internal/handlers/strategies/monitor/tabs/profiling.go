@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/backtesting-org/kronos-cli/internal/ui"
-	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
+	monitoring2 "github.com/backtesting-org/kronos-sdk/pkg/types/monitoring"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -15,12 +15,12 @@ const tickFrequency = 1 * time.Second
 
 // ProfilingModel displays strategy execution profiling data
 type ProfilingModel struct {
-	querier    monitoring.ViewQuerier
+	querier    monitoring2.ViewQuerier
 	instanceID string
 
 	// Data
-	stats      *monitoring.ProfilingStats
-	executions []monitoring.ProfilingMetrics
+	stats      *monitoring2.ProfilingStats
+	executions []monitoring2.ProfilingMetrics
 
 	// UI state
 	loading  bool
@@ -30,7 +30,7 @@ type ProfilingModel struct {
 }
 
 // NewProfilingModel creates a new profiling tab
-func NewProfilingModel(querier monitoring.ViewQuerier, instanceID string) *ProfilingModel {
+func NewProfilingModel(querier monitoring2.ViewQuerier, instanceID string) *ProfilingModel {
 	return &ProfilingModel{
 		querier:    querier,
 		instanceID: instanceID,
@@ -41,8 +41,8 @@ func NewProfilingModel(querier monitoring.ViewQuerier, instanceID string) *Profi
 
 // Messages
 type profilingDataMsg struct {
-	stats      *monitoring.ProfilingStats
-	executions []monitoring.ProfilingMetrics
+	stats      *monitoring2.ProfilingStats
+	executions []monitoring2.ProfilingMetrics
 	err        error
 }
 

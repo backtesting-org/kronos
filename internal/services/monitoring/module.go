@@ -1,7 +1,8 @@
 package monitoring
 
 import (
-	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
+	monitoring2 "github.com/backtesting-org/kronos-sdk/pkg/monitoring"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/monitoring"
 	"go.uber.org/fx"
 )
 
@@ -10,7 +11,7 @@ var Module = fx.Module("monitoring",
 	fx.Provide(
 		// ViewRegistry implementation - pulls data from SDK components
 		fx.Annotate(
-			NewViewRegistry,
+			monitoring2.NewViewRegistry,
 			fx.As(new(monitoring.ViewRegistry)),
 		),
 		// ViewQuerier implementation - queries running instances via socket

@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"time"
 
+	monitoring2 "github.com/backtesting-org/kronos-sdk/pkg/types/monitoring"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/portfolio"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/backtesting-org/kronos-cli/internal/services/monitoring"
-	pkgmonitoring "github.com/backtesting-org/kronos-cli/pkg/monitoring"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/kronos/numerical"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/strategy"
@@ -23,7 +23,7 @@ import (
 var _ = Describe("Querier", func() {
 	var (
 		tmpDir     string
-		querier    pkgmonitoring.ViewQuerier
+		querier    monitoring2.ViewQuerier
 		server     net.Listener
 		httpServer *http.Server
 		instanceID string
@@ -70,7 +70,7 @@ var _ = Describe("Querier", func() {
 		It("should return PnL data from running instance", func() {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/pnl", func(w http.ResponseWriter, r *http.Request) {
-				pnl := pkgmonitoring.PnLView{
+				pnl := monitoring2.PnLView{
 					StrategyName:  "test-strategy",
 					RealizedPnL:   numerical.NewFromFloat(100.50),
 					UnrealizedPnL: numerical.NewFromFloat(25.25),
@@ -169,7 +169,7 @@ var _ = Describe("Querier", func() {
 		It("should return strategy metrics", func() {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/metrics", func(w http.ResponseWriter, r *http.Request) {
-				metrics := pkgmonitoring.StrategyMetrics{
+				metrics := monitoring2.StrategyMetrics{
 					StrategyName:     "test-strategy",
 					Status:           "running",
 					SignalsGenerated: 42,
@@ -245,7 +245,7 @@ var _ = Describe("Querier", func() {
 		It("should return profiling stats from running instance", func() {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/profiling/stats", func(w http.ResponseWriter, r *http.Request) {
-				stats := pkgmonitoring.ProfilingStats{}
+				stats := monitoring2.ProfilingStats{}
 				json.NewEncoder(w).Encode(stats)
 			})
 			startMockServer(mux)
@@ -269,7 +269,7 @@ var _ = Describe("Querier", func() {
 				limit := r.URL.Query().Get("limit")
 				Expect(limit).To(Equal("10"))
 
-				executions := []pkgmonitoring.ProfilingMetrics{}
+				executions := []monitoring2.ProfilingMetrics{}
 				json.NewEncoder(w).Encode(executions)
 			})
 			startMockServer(mux)

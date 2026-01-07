@@ -6,7 +6,7 @@ import (
 
 	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/monitor/tabs"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
-	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/monitoring"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
