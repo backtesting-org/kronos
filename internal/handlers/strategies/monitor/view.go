@@ -1,7 +1,7 @@
 package monitor
 
 import (
-	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/monitoring"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

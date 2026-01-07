@@ -6,23 +6,23 @@ import (
 	"time"
 
 	"github.com/backtesting-org/kronos-cli/internal/ui"
-	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
+	monitoring2 "github.com/backtesting-org/kronos-sdk/pkg/types/monitoring"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 // OverviewModel is a tab that displays an overview of the strategy
 type OverviewModel struct {
-	querier    monitoring.ViewQuerier
+	querier    monitoring2.ViewQuerier
 	instanceID string
-	pnl        *monitoring.PnLView
-	metrics    *monitoring.StrategyMetrics
+	pnl        *monitoring2.PnLView
+	metrics    *monitoring2.StrategyMetrics
 	loading    bool
 	err        error
 }
 
 // NewOverviewModel creates a new overview tab
-func NewOverviewModel(querier monitoring.ViewQuerier, instanceID string) *OverviewModel {
+func NewOverviewModel(querier monitoring2.ViewQuerier, instanceID string) *OverviewModel {
 	return &OverviewModel{
 		querier:    querier,
 		instanceID: instanceID,
@@ -32,8 +32,8 @@ func NewOverviewModel(querier monitoring.ViewQuerier, instanceID string) *Overvi
 
 // Overview messages
 type overviewDataMsg struct {
-	pnl     *monitoring.PnLView
-	metrics *monitoring.StrategyMetrics
+	pnl     *monitoring2.PnLView
+	metrics *monitoring2.StrategyMetrics
 	err     error
 }
 

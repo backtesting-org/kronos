@@ -6,22 +6,22 @@ import (
 	"time"
 
 	"github.com/backtesting-org/kronos-cli/internal/ui"
-	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
+	monitoring2 "github.com/backtesting-org/kronos-sdk/pkg/types/monitoring"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 // PnLModel is a tab that displays PnL data
 type PnLModel struct {
-	querier    monitoring.ViewQuerier
+	querier    monitoring2.ViewQuerier
 	instanceID string
-	pnl        *monitoring.PnLView
+	pnl        *monitoring2.PnLView
 	loading    bool
 	err        error
 }
 
 // NewPnLModel creates a new PnL tab
-func NewPnLModel(querier monitoring.ViewQuerier, instanceID string) *PnLModel {
+func NewPnLModel(querier monitoring2.ViewQuerier, instanceID string) *PnLModel {
 	return &PnLModel{
 		querier:    querier,
 		instanceID: instanceID,
@@ -31,7 +31,7 @@ func NewPnLModel(querier monitoring.ViewQuerier, instanceID string) *PnLModel {
 
 // PnL messages
 type pnlDataMsg struct {
-	pnl *monitoring.PnLView
+	pnl *monitoring2.PnLView
 	err error
 }
 

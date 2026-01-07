@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/backtesting-org/kronos-cli/internal/ui"
-	"github.com/backtesting-org/kronos-cli/pkg/monitoring"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/monitoring"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )

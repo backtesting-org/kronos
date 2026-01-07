@@ -5,7 +5,6 @@ import (
 )
 
 // Module provides our startup wrapper
-// The actual SDK startup (sdkRuntime.Runtime) is provided by pkg.Module
 var Module = fx.Module("startup",
 	fx.Provide(
 		NewRuntime,
