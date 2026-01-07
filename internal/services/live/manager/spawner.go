@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/pkg/live"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 )
 
@@ -24,7 +24,7 @@ func NewProcessSpawner(logger logging.ApplicationLogger) live.ProcessSpawner {
 }
 
 // Spawn creates a new kronos run-strategy process
-func (ps *processSpawner) Spawn(ctx context.Context, strategy *strategy.Strategy) (*exec.Cmd, error) {
+func (ps *processSpawner) Spawn(ctx context.Context, strategy *config.Strategy) (*exec.Cmd, error) {
 	// Build command: kronos run-strategy --strategy <name>
 	// The run-strategy command will look in ./strategies/{strategyName}
 	cmd := exec.CommandContext(ctx, "kronos", "run-strategy", "--strategy", strategy.Name)

@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/settings"
-	"github.com/backtesting-org/kronos-cli/internal/config/settings/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/router"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/donderom/bubblon"
@@ -15,12 +14,12 @@ import (
 
 // ConnectorListModel represents the settings list view
 type ConnectorListModel struct {
-	configured         []settings.Connector // Already configured connectors
-	available          []string             // Available but not configured
+	configured         []config.Connector // Already configured connectors
+	available          []string           // Available but not configured
 	cursor             int
 	inAvailableSection bool // true if cursor is in "add new" section
-	config             settings.Configuration
-	connectorSvc       connectors.ConnectorService
+	config             config.Configuration
+	connectorSvc       config.ConnectorService
 	router             router.Router
 	formFactory        ConnectorFormViewFactory
 	deleteFactory      DeleteConfirmViewFactory
@@ -30,19 +29,19 @@ type ConnectorListModel struct {
 
 // NewSettingsListView creates a new settings list view
 func NewSettingsListView(
-	config settings.Configuration,
-	connectorSvc connectors.ConnectorService,
+	cfg config.Configuration,
+	connectorSvc config.ConnectorService,
 	r router.Router,
 	formFactory ConnectorFormViewFactory,
 	deleteFactory DeleteConfirmViewFactory,
 ) tea.Model {
 	return &ConnectorListModel{
-		config:        config,
+		config:        cfg,
 		connectorSvc:  connectorSvc,
 		router:        r,
 		formFactory:   formFactory,
 		deleteFactory: deleteFactory,
-		configured:    []settings.Connector{},
+		configured:    []config.Connector{},
 		available:     []string{},
 	}
 }
@@ -226,7 +225,7 @@ func (m *ConnectorListModel) View() string {
 	return content.String()
 }
 
-func (m *ConnectorListModel) renderConfiguredConnector(conn settings.Connector, selected bool) string {
+func (m *ConnectorListModel) renderConfiguredConnector(conn config.Connector, selected bool) string {
 	var itemStyle lipgloss.Style
 	var nameStyle lipgloss.Style
 

@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 )
 
 // InstanceStatus represents the current state of a strategy instance
@@ -39,7 +39,7 @@ type Instance struct {
 // InstanceManager orchestrates spawning, tracking, and lifecycle of strategy instances
 type InstanceManager interface {
 	// Start spawns a new strategy instance
-	Start(ctx context.Context, strategy *strategy.Strategy, frameworkRoot string) (*Instance, error)
+	Start(ctx context.Context, strategy *config.Strategy, frameworkRoot string) (*Instance, error)
 
 	// Stop gracefully terminates an instance by ID
 	Stop(instanceID string) error
@@ -69,7 +69,7 @@ type InstanceManager interface {
 // ProcessSpawner creates and configures child processes with proper isolation
 type ProcessSpawner interface {
 	// Spawn creates a new kronos run-strategy process
-	Spawn(ctx context.Context, strategy *strategy.Strategy) (*exec.Cmd, error)
+	Spawn(ctx context.Context, strategy *config.Strategy) (*exec.Cmd, error)
 
 	// AttachMonitor starts monitoring process for crashes
 	AttachMonitor(instance *Instance) error

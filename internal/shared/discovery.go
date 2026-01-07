@@ -1,21 +1,21 @@
 package shared
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 )
 
 type StrategyDiscovery interface {
-	DiscoverStrategies() ([]strategy.Strategy, error)
+	DiscoverStrategies() ([]config.Strategy, error)
 }
 
 type strategyDiscovery struct {
-	strategyConfig strategy.StrategyConfig
+	strategyConfig config.StrategyConfig
 	logger         logging.ApplicationLogger
 }
 
 func NewStrategyDiscovery(
-	strategyConfig strategy.StrategyConfig,
+	strategyConfig config.StrategyConfig,
 	logger logging.ApplicationLogger,
 ) StrategyDiscovery {
 	return &strategyDiscovery{
@@ -25,7 +25,7 @@ func NewStrategyDiscovery(
 }
 
 // DiscoverStrategies finds and compiles strategies
-func (s *strategyDiscovery) DiscoverStrategies() ([]strategy.Strategy, error) {
+func (s *strategyDiscovery) DiscoverStrategies() ([]config.Strategy, error) {
 	strategies, err := s.strategyConfig.FindStrategies()
 
 	if err != nil {

@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/settings"
-	"github.com/backtesting-org/kronos-cli/internal/config/settings/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/router"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -17,9 +16,9 @@ import (
 // ConnectorFormModel represents the connector detail/edit view
 type ConnectorFormModel struct {
 	form          *huh.Form
-	connector     settings.Connector
-	config        settings.Configuration
-	connectorSvc  connectors.ConnectorService
+	connector     config.Connector
+	config        config.Configuration
+	connectorSvc  config.ConnectorService
 	router        router.Router
 	deleteFactory DeleteConfirmViewFactory
 	isEditMode    bool
@@ -40,8 +39,8 @@ type ConnectorFormModel struct {
 
 // NewConnectorFormView creates a new connector form view with Huh forms
 func NewConnectorFormView(
-	config settings.Configuration,
-	connectorSvc connectors.ConnectorService,
+	config config.Configuration,
+	connectorSvc config.ConnectorService,
 	r router.Router,
 	deleteFactory DeleteConfirmViewFactory,
 	connectorName string,
@@ -320,7 +319,7 @@ func (m *ConnectorFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Build connector from form values
-		m.connector = settings.Connector{
+		m.connector = config.Connector{
 			Name:        m.exchangeName,
 			Network:     m.network,
 			Enabled:     m.enabled,

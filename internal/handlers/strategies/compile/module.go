@@ -1,14 +1,14 @@
 package compile
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	tea "github.com/charmbracelet/bubbletea"
 	"go.uber.org/fx"
 )
 
 // CompileViewFactory creates compile views with transient strategy data
-type CompileViewFactory func(*strategy.Strategy) tea.Model
+type CompileViewFactory func(*config.Strategy) tea.Model
 
 // Module provides compile view constructor in DI
 var Module = fx.Module("compile",
@@ -21,7 +21,7 @@ var Module = fx.Module("compile",
 func NewCompileViewFactory(
 	compileService strategyTypes.CompileService,
 ) CompileViewFactory {
-	return func(s *strategy.Strategy) tea.Model {
+	return func(s *config.Strategy) tea.Model {
 		model := NewCompileModel(compileService)
 		model.SetStrategy(s)
 		return model
