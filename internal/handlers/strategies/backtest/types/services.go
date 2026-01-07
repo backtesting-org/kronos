@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/config/settings"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 )
 
 type AnalyzeService interface {
@@ -10,5 +10,5 @@ type AnalyzeService interface {
 
 type BacktestService interface {
 	RunInteractive() error
-	ExecuteBacktest(cfg *settings.Settings) error
+	ExecuteBacktest(cfg *config.Settings) error
 }

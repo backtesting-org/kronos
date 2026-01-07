@@ -1,8 +1,8 @@
 package services
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/config/settings"
 	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/backtest/types"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 )
 
 // backtestService handles backtest operations
@@ -22,7 +22,7 @@ func (s *backtestService) RunInteractive() error {
 	return nil
 }
 
-func (s *backtestService) ExecuteBacktest(cfg *settings.Settings) error {
+func (s *backtestService) ExecuteBacktest(cfg *config.Settings) error {
 	// TODO: Implement actual backtest execution
 	return nil
 }

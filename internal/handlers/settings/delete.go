@@ -3,8 +3,8 @@ package settings
 import (
 	"fmt"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/settings"
 	"github.com/backtesting-org/kronos-cli/internal/router"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 )
@@ -13,7 +13,7 @@ import (
 type DeleteConfirmModel struct {
 	form          *huh.Form
 	connectorName string
-	config        settings.Configuration
+	config        config.Configuration
 	router        router.Router
 	confirmed     bool
 	err           error
@@ -21,7 +21,7 @@ type DeleteConfirmModel struct {
 
 // NewDeleteConfirmView creates a new delete confirmation view with Huh
 func NewDeleteConfirmView(
-	config settings.Configuration,
+	config config.Configuration,
 	r router.Router,
 	connectorName string,
 ) tea.Model {

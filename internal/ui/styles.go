@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -132,27 +131,3 @@ var (
 			Foreground(ColorSuccess).
 			Bold(true)
 )
-
-// GetStatusIndicator returns a styled status indicator
-func GetStatusIndicator(status strategy.StrategyStatus) string {
-	switch status {
-	case strategy.StatusReady:
-		return StatusReadyStyle.Render("● READY")
-	case strategy.StatusRunning:
-		return StatusRunningStyle.Render("● RUNNING")
-	case strategy.StatusStopped:
-		return StatusDangerStyle.Render("● STOPPED")
-	case strategy.StatusError:
-		return StatusDangerStyle.Render("● ERROR")
-	default:
-		return StatusReadyStyle.Render("● READY")
-	}
-}
-
-// GetModeIndicator returns a styled mode indicator
-func GetModeIndicator(dryRun bool) string {
-	if dryRun {
-		return StatusReadyStyle.Render("📝 PAPER TRADING")
-	}
-	return StatusDangerStyle.Render("🔴 LIVE TRADING")
-}

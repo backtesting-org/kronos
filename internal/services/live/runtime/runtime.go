@@ -9,11 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/settings/connectors"
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/services/monitoring"
 	"github.com/backtesting-org/kronos-cli/pkg/live"
 	pkgmonitoring "github.com/backtesting-org/kronos-cli/pkg/monitoring"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/connector"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/portfolio"
@@ -23,16 +22,16 @@ import (
 type liveRuntime struct {
 	logger       logging.ApplicationLogger
 	startup      startup.Startup
-	connectorSvc connectors.ConnectorService
-	strategyConf strategy.StrategyConfig
+	connectorSvc config.ConnectorService
+	strategyConf config.StrategyConfig
 	viewRegistry pkgmonitoring.ViewRegistry
 }
 
 func NewRuntime(
 	logger logging.ApplicationLogger,
 	runtime startup.Startup,
-	connectorSvc connectors.ConnectorService,
-	strategyConf strategy.StrategyConfig,
+	connectorSvc config.ConnectorService,
+	strategyConf config.StrategyConfig,
 	viewRegistry pkgmonitoring.ViewRegistry,
 ) live.Runtime {
 	return &liveRuntime{
@@ -147,7 +146,7 @@ func (r *liveRuntime) Run(strategyDir string) error {
 }
 
 // convertConfigAssetsToInstruments converts string instrument names to SDK connector.Instrument enums
-func (r *liveRuntime) convertConfigAssetsToInstruments(strat *strategy.Strategy) map[portfolio.Asset][]connector.Instrument {
+func (r *liveRuntime) convertConfigAssetsToInstruments(strat *config.Strategy) map[portfolio.Asset][]connector.Instrument {
 	instrumentMap := make(map[portfolio.Asset][]connector.Instrument)
 
 	for _, assets := range strat.Assets {

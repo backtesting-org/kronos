@@ -1,10 +1,10 @@
 package browse
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/compile"
 	"github.com/backtesting-org/kronos-cli/internal/handlers/strategies/live"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/donderom/bubblon"
 )
@@ -27,7 +27,7 @@ type StrategyDetailView interface {
 
 // strategyDetailView represents the strategy detail view with action options (STRATEGY screen)
 type strategyDetailView struct {
-	strategy       *strategy.Strategy
+	strategy       *config.Strategy
 	actions        []ActionType
 	cursor         int
 	compileFactory compile.CompileViewFactory
@@ -38,7 +38,7 @@ type strategyDetailView struct {
 func newStrategyDetailView(
 	compileFactory compile.CompileViewFactory,
 	liveFactory live.LiveViewFactory,
-	s *strategy.Strategy,
+	s *config.Strategy,
 ) tea.Model {
 	return &strategyDetailView{
 		strategy:       s,

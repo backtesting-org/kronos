@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/services/live/manager"
 	"github.com/backtesting-org/kronos-cli/pkg/live"
 )
@@ -20,7 +20,7 @@ var _ = Describe("ProcessSpawner", func() {
 	var (
 		spawner      live.ProcessSpawner
 		logger       logging.ApplicationLogger
-		testStrategy *strategy.Strategy
+		testStrategy *config.Strategy
 		tmpDir       string
 		ctx          context.Context
 		cancel       context.CancelFunc
@@ -44,7 +44,7 @@ var _ = Describe("ProcessSpawner", func() {
 		logger = &logging.NoOpLogger{}
 		spawner = manager.NewProcessSpawner(logger)
 
-		testStrategy = &strategy.Strategy{
+		testStrategy = &config.Strategy{
 			Name: "test-momentum",
 			Path: "./strategies/test-momentum",
 		}
@@ -132,8 +132,8 @@ var _ = Describe("ProcessSpawner", func() {
 		})
 
 		It("should create unique log files for different strategies", func() {
-			strategy1 := &strategy.Strategy{Name: "momentum-1", Path: "./strategies/momentum-1"}
-			strategy2 := &strategy.Strategy{Name: "momentum-2", Path: "./strategies/momentum-2"}
+			strategy1 := &config.Strategy{Name: "momentum-1", Path: "./strategies/momentum-1"}
+			strategy2 := &config.Strategy{Name: "momentum-2", Path: "./strategies/momentum-2"}
 
 			_, err := spawner.Spawn(ctx, strategy1)
 			Expect(err).NotTo(HaveOccurred())
@@ -194,7 +194,7 @@ var _ = Describe("ProcessSpawner", func() {
 
 		Context("when strategy name has special characters", func() {
 			It("should handle strategy names safely", func() {
-				specialStrategy := &strategy.Strategy{
+				specialStrategy := &config.Strategy{
 					Name: "test-strategy-v1.2.3",
 					Path: "./strategies/test",
 				}
@@ -339,7 +339,7 @@ var _ = Describe("ProcessSpawner", func() {
 
 	Describe("Edge Cases", func() {
 		It("should handle empty strategy name", func() {
-			emptyStrategy := &strategy.Strategy{
+			emptyStrategy := &config.Strategy{
 				Name: "",
 				Path: "./strategies/empty",
 			}
@@ -353,7 +353,7 @@ var _ = Describe("ProcessSpawner", func() {
 		It("should handle very long strategy names", func() {
 			longName := strings.Repeat("a", 255)
 
-			longStrategy := &strategy.Strategy{
+			longStrategy := &config.Strategy{
 				Name: longName,
 				Path: "./strategies/long",
 			}

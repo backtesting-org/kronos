@@ -6,27 +6,26 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/settings"
-	"github.com/backtesting-org/kronos-cli/internal/config/settings/connectors"
 	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
+	"github.com/backtesting-org/kronos-sdk/pkg/config/settings/connectors"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/shared"
 	"github.com/backtesting-org/kronos-cli/pkg/live"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 )
 
 type LiveService interface {
-	FindStrategies() ([]strategy.Strategy, error)
-	FindConnectors() []settings.Connector
-	ValidateStrategy(strat *strategy.Strategy) error
-	ExecuteStrategy(ctx context.Context, strategy *strategy.Strategy, exchange *settings.Connector) error
+	FindStrategies() ([]config.Strategy, error)
+	FindConnectors() []config.Connector
+	ValidateStrategy(strat *config.Strategy) error
+	ExecuteStrategy(ctx context.Context, strategy *config.Strategy, exchange *config.Connector) error
 }
 
 // liveService orchestrates live trading by coordinating other services
 type liveService struct {
-	settings         settings.Configuration
-	connectorService connectors.ConnectorService
+	settings         config.Configuration
+	connectorService config.ConnectorService
 	compile          strategyTypes.CompileService
 	discover         shared.StrategyDiscovery
 	logger           logging.ApplicationLogger
@@ -34,8 +33,8 @@ type liveService struct {
 }
 
 func NewLiveService(
-	kronos settings.Configuration,
-	connectorService connectors.ConnectorService,
+	kronos config.Configuration,
+	connectorService config.ConnectorService,
 	compileSvc strategyTypes.CompileService,
 	discovery shared.StrategyDiscovery,
 	logger logging.ApplicationLogger,
@@ -51,7 +50,7 @@ func NewLiveService(
 	}
 }
 
-func (s *liveService) FindStrategies() ([]strategy.Strategy, error) {
+func (s *liveService) FindStrategies() ([]config.Strategy, error) {
 	strategies, err := s.discover.DiscoverStrategies()
 
 	if err != nil {
@@ -61,23 +60,23 @@ func (s *liveService) FindStrategies() ([]strategy.Strategy, error) {
 	return strategies, nil
 }
 
-func (s *liveService) FindConnectors() []settings.Connector {
+func (s *liveService) FindConnectors() []config.Connector {
 	setting, err := s.settings.LoadSettings()
 
 	if err != nil {
 		s.logger.Error("Failed to load settings", "error", err)
-		return []settings.Connector{}
+		return []config.Connector{}
 	}
 
 	if setting == nil {
-		return []settings.Connector{}
+		return []config.Connector{}
 	}
 
 	return setting.Connectors
 }
 
 // ValidateStrategy checks if the strategy can be executed (has valid connectors)
-func (s *liveService) ValidateStrategy(strat *strategy.Strategy) error {
+func (s *liveService) ValidateStrategy(strat *config.Strategy) error {
 	_, err := s.connectorService.GetConnectorConfigsForStrategy(strat.Exchanges)
 	if err != nil {
 		// Check if it's a StrategyValidationError so we can provide detailed feedback
@@ -120,7 +119,7 @@ func (s *liveService) ValidateStrategy(strat *strategy.Strategy) error {
 				}
 			}
 
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 
 		return fmt.Errorf("failed to validate connectors: %w", err)
@@ -129,7 +128,7 @@ func (s *liveService) ValidateStrategy(strat *strategy.Strategy) error {
 }
 
 // ExecuteStrategy runs the selected strategy with all its configured exchanges
-func (s *liveService) ExecuteStrategy(ctx context.Context, strat *strategy.Strategy, connector *settings.Connector) error {
+func (s *liveService) ExecuteStrategy(ctx context.Context, strat *config.Strategy, connector *config.Connector) error {
 	// 1. Pre-validate that we have connectors for this strategy's exchanges
 	connectorConfigs, err := s.connectorService.GetConnectorConfigsForStrategy(strat.Exchanges)
 	if err != nil {

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/donderom/bubblon"
@@ -15,12 +15,12 @@ import (
 
 type CompileModel interface {
 	tea.Model
-	SetStrategy(strategy *strategy.Strategy)
+	SetStrategy(strategy *config.Strategy)
 	Done() bool
 }
 
 type compileModel struct {
-	strategy       *strategy.Strategy
+	strategy       *config.Strategy
 	compileService strategyTypes.CompileService
 	done           bool
 	err            error
@@ -40,7 +40,7 @@ func NewCompileModel(compileService strategyTypes.CompileService) CompileModel {
 	}
 }
 
-func (m *compileModel) SetStrategy(strategy *strategy.Strategy) {
+func (m *compileModel) SetStrategy(strategy *config.Strategy) {
 	m.strategy = strategy
 }
 
@@ -154,7 +154,7 @@ func (m *compileModel) Done() bool {
 }
 
 // GetStrategy returns the strategy being compiled
-func (m *compileModel) GetStrategy() *strategy.Strategy {
+func (m *compileModel) GetStrategy() *config.Strategy {
 	return m.strategy
 }
 

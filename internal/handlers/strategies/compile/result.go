@@ -3,20 +3,20 @@ package compile
 import (
 	"fmt"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/donderom/bubblon"
 )
 
 type resultModel struct {
-	strategy *strategy.Strategy
+	strategy *config.Strategy
 	err      error
 }
 
 // NewResultModel creates a result model that shows compilation result
-func NewResultModel(strat *strategy.Strategy, err error) tea.Model {
+func NewResultModel(strat *config.Strategy, err error) tea.Model {
 	return &resultModel{
 		strategy: strat,
 		err:      err,

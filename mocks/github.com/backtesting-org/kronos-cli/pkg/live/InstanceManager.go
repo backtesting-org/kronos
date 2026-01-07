@@ -5,10 +5,11 @@ package live
 import (
 	context "context"
 
-	live "github.com/backtesting-org/kronos-cli/pkg/live"
-	mock "github.com/stretchr/testify/mock"
+	config "github.com/backtesting-org/kronos-sdk/pkg/types/config"
 
-	strategy "github.com/backtesting-org/kronos-cli/internal/config/strategy"
+	live "github.com/backtesting-org/kronos-cli/pkg/live"
+
+	mock "github.com/stretchr/testify/mock"
 
 	time "time"
 )
@@ -326,9 +327,9 @@ func (_c *InstanceManager_Shutdown_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
-// Start provides a mock function with given fields: ctx, _a1, frameworkRoot
-func (_m *InstanceManager) Start(ctx context.Context, _a1 *strategy.Strategy, frameworkRoot string) (*live.Instance, error) {
-	ret := _m.Called(ctx, _a1, frameworkRoot)
+// Start provides a mock function with given fields: ctx, strategy, frameworkRoot
+func (_m *InstanceManager) Start(ctx context.Context, strategy *config.Strategy, frameworkRoot string) (*live.Instance, error) {
+	ret := _m.Called(ctx, strategy, frameworkRoot)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Start")
@@ -336,19 +337,19 @@ func (_m *InstanceManager) Start(ctx context.Context, _a1 *strategy.Strategy, fr
 
 	var r0 *live.Instance
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *strategy.Strategy, string) (*live.Instance, error)); ok {
-		return rf(ctx, _a1, frameworkRoot)
+	if rf, ok := ret.Get(0).(func(context.Context, *config.Strategy, string) (*live.Instance, error)); ok {
+		return rf(ctx, strategy, frameworkRoot)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *strategy.Strategy, string) *live.Instance); ok {
-		r0 = rf(ctx, _a1, frameworkRoot)
+	if rf, ok := ret.Get(0).(func(context.Context, *config.Strategy, string) *live.Instance); ok {
+		r0 = rf(ctx, strategy, frameworkRoot)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*live.Instance)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *strategy.Strategy, string) error); ok {
-		r1 = rf(ctx, _a1, frameworkRoot)
+	if rf, ok := ret.Get(1).(func(context.Context, *config.Strategy, string) error); ok {
+		r1 = rf(ctx, strategy, frameworkRoot)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -363,15 +364,15 @@ type InstanceManager_Start_Call struct {
 
 // Start is a helper method to define mock.On call
 //   - ctx context.Context
-//   - _a1 *strategy.Strategy
+//   - strategy *config.Strategy
 //   - frameworkRoot string
-func (_e *InstanceManager_Expecter) Start(ctx interface{}, _a1 interface{}, frameworkRoot interface{}) *InstanceManager_Start_Call {
-	return &InstanceManager_Start_Call{Call: _e.mock.On("Start", ctx, _a1, frameworkRoot)}
+func (_e *InstanceManager_Expecter) Start(ctx interface{}, strategy interface{}, frameworkRoot interface{}) *InstanceManager_Start_Call {
+	return &InstanceManager_Start_Call{Call: _e.mock.On("Start", ctx, strategy, frameworkRoot)}
 }
 
-func (_c *InstanceManager_Start_Call) Run(run func(ctx context.Context, _a1 *strategy.Strategy, frameworkRoot string)) *InstanceManager_Start_Call {
+func (_c *InstanceManager_Start_Call) Run(run func(ctx context.Context, strategy *config.Strategy, frameworkRoot string)) *InstanceManager_Start_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*strategy.Strategy), args[2].(string))
+		run(args[0].(context.Context), args[1].(*config.Strategy), args[2].(string))
 	})
 	return _c
 }
@@ -381,7 +382,7 @@ func (_c *InstanceManager_Start_Call) Return(_a0 *live.Instance, _a1 error) *Ins
 	return _c
 }
 
-func (_c *InstanceManager_Start_Call) RunAndReturn(run func(context.Context, *strategy.Strategy, string) (*live.Instance, error)) *InstanceManager_Start_Call {
+func (_c *InstanceManager_Start_Call) RunAndReturn(run func(context.Context, *config.Strategy, string) (*live.Instance, error)) *InstanceManager_Start_Call {
 	_c.Call.Return(run)
 	return _c
 }

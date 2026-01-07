@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/backtesting-org/kronos-cli/internal/config/strategy"
 	"github.com/backtesting-org/kronos-cli/pkg/live"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
 	"github.com/google/uuid"
 )
@@ -39,7 +39,7 @@ func NewInstanceManager(
 }
 
 // Start spawns a new strategy instance
-func (im *instanceManager) Start(ctx context.Context, strategy *strategy.Strategy, frameworkRoot string) (*live.Instance, error) {
+func (im *instanceManager) Start(ctx context.Context, strategy *config.Strategy, frameworkRoot string) (*live.Instance, error) {
 	im.mu.Lock()
 	defer im.mu.Unlock()
 

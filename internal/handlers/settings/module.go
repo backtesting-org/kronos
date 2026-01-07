@@ -1,9 +1,8 @@
 package settings
 
 import (
-	"github.com/backtesting-org/kronos-cli/internal/config/settings"
-	"github.com/backtesting-org/kronos-cli/internal/config/settings/connectors"
 	"github.com/backtesting-org/kronos-cli/internal/router"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	tea "github.com/charmbracelet/bubbletea"
 	"go.uber.org/fx"
 )
@@ -24,8 +23,8 @@ type DeleteConfirmViewFactory func(connectorName string) tea.Model
 
 // NewSettingsListViewFactory creates a factory function for the settings list view
 func NewSettingsListViewFactory(
-	config settings.Configuration,
-	connectorSvc connectors.ConnectorService,
+	config config.Configuration,
+	connectorSvc config.ConnectorService,
 	r router.Router,
 	formFactory ConnectorFormViewFactory,
 	deleteFactory DeleteConfirmViewFactory,
@@ -37,8 +36,8 @@ func NewSettingsListViewFactory(
 
 // NewConnectorFormViewFactory creates a factory function for the connector form view
 func NewConnectorFormViewFactory(
-	config settings.Configuration,
-	connectorSvc connectors.ConnectorService,
+	config config.Configuration,
+	connectorSvc config.ConnectorService,
 	r router.Router,
 	deleteFactory DeleteConfirmViewFactory,
 ) ConnectorFormViewFactory {
@@ -49,7 +48,7 @@ func NewConnectorFormViewFactory(
 
 // NewDeleteConfirmViewFactory creates a factory function for the delete confirmation view
 func NewDeleteConfirmViewFactory(
-	config settings.Configuration,
+	config config.Configuration,
 	r router.Router,
 ) DeleteConfirmViewFactory {
 	return func(connectorName string) tea.Model {
