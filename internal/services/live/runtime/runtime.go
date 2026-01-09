@@ -31,7 +31,7 @@ func NewRuntime(
 }
 
 func (r *liveRuntime) Run(strategyDir string) error {
-	kronosPath := "../../kronos.yml"
+	kronosPath := "kronos.yml"
 	cfg, err := r.configLoader.LoadForStrategy(strategyDir, kronosPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -39,7 +39,7 @@ func (r *liveRuntime) Run(strategyDir string) error {
 
 	r.logger.Info("Config loaded", "strategy", cfg.Strategy.Name)
 
-	err = r.startup.Start(cfg.PluginPath, kronosPath)
+	err = r.startup.Start(strategyDir, kronosPath)
 	if err != nil {
 		return fmt.Errorf("failed to start: %w", err)
 	}
