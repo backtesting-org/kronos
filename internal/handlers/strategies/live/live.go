@@ -53,7 +53,7 @@ func (m *liveModel) Init() tea.Cmd {
 	return func() tea.Msg {
 		// Spawn the live trading instance in background
 		// This will start a separate process and return immediately
-		err := m.service.ExecuteStrategy(m.ctx, m.strategy, nil)
+		err := m.service.ExecuteStrategy(m.ctx, m.strategy)
 		return liveSpawnedMsg{err: err}
 	}
 }

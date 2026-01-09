@@ -2,12 +2,10 @@ package live
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
 	strategyTypes "github.com/backtesting-org/kronos-cli/pkg/strategy"
-	"github.com/backtesting-org/kronos-sdk/pkg/config/settings/connectors"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 
 	"github.com/backtesting-org/kronos-cli/internal/shared"
@@ -16,15 +14,11 @@ import (
 )
 
 type LiveService interface {
-	FindStrategies() ([]config.Strategy, error)
-	FindConnectors() []config.Connector
-	ValidateStrategy(strat *config.Strategy) error
-	ExecuteStrategy(ctx context.Context, strategy *config.Strategy, exchange *config.Connector) error
+	ExecuteStrategy(ctx context.Context, strategy *config.Strategy) error
 }
 
 // liveService orchestrates live trading by coordinating other services
 type liveService struct {
-	settings         config.Configuration
 	connectorService config.ConnectorService
 	compile          strategyTypes.CompileService
 	discover         shared.StrategyDiscovery
@@ -33,7 +27,6 @@ type liveService struct {
 }
 
 func NewLiveService(
-	kronos config.Configuration,
 	connectorService config.ConnectorService,
 	compileSvc strategyTypes.CompileService,
 	discovery shared.StrategyDiscovery,
@@ -41,7 +34,6 @@ func NewLiveService(
 	manager live.InstanceManager,
 ) LiveService {
 	return &liveService{
-		settings:         kronos,
 		connectorService: connectorService,
 		compile:          compileSvc,
 		discover:         discovery,
@@ -50,85 +42,8 @@ func NewLiveService(
 	}
 }
 
-func (s *liveService) FindStrategies() ([]config.Strategy, error) {
-	strategies, err := s.discover.DiscoverStrategies()
-
-	if err != nil {
-		return nil, err
-	}
-
-	return strategies, nil
-}
-
-func (s *liveService) FindConnectors() []config.Connector {
-	setting, err := s.settings.LoadSettings()
-
-	if err != nil {
-		s.logger.Error("Failed to load settings", "error", err)
-		return []config.Connector{}
-	}
-
-	if setting == nil {
-		return []config.Connector{}
-	}
-
-	return setting.Connectors
-}
-
-// ValidateStrategy checks if the strategy can be executed (has valid connectors)
-func (s *liveService) ValidateStrategy(strat *config.Strategy) error {
-	_, err := s.connectorService.GetConnectorConfigsForStrategy(strat.Exchanges)
-	if err != nil {
-		// Check if it's a StrategyValidationError so we can provide detailed feedback
-		var sve *connectors.StrategyValidationError
-		if errors.As(err, &sve) {
-			// Build a detailed error message from the specific problems
-			msg := fmt.Sprintf("Cannot start '%s' - missing or invalid connectors:\n\n", strat.Name)
-
-			notFound := sve.GetExchangesByProblem("not_found")
-			notEnabled := sve.GetExchangesByProblem("not_enabled")
-			missingCreds := sve.GetExchangesByProblem("missing_credentials")
-			invalidConfig := sve.GetExchangesByProblem("invalid_config")
-
-			if len(notFound) > 0 {
-				msg += fmt.Sprintf("❌ Not in SDK: %v\n   (Exchange connector not available)\n\n", notFound)
-			}
-			if len(notEnabled) > 0 {
-				msg += fmt.Sprintf("❌ Not enabled: %v\n   (Add to exchanges.yml and set enabled: true)\n\n", notEnabled)
-			}
-			if len(missingCreds) > 0 {
-				msg += fmt.Sprintf("❌ Missing credentials: %v\n", missingCreds)
-				for _, ex := range missingCreds {
-					if valErr := sve.GetExchangeError(ex); valErr != nil && len(valErr.Missing) > 0 {
-						msg += fmt.Sprintf("   • %s needs: %v\n", ex, valErr.Missing)
-					}
-				}
-				msg += "\n"
-			}
-			if len(invalidConfig) > 0 {
-				msg += fmt.Sprintf("❌ Invalid config: %v\n", invalidConfig)
-				for _, ex := range invalidConfig {
-					if valErr := sve.GetExchangeError(ex); valErr != nil {
-						if valErr.SDKValidationErr != "" {
-							msg += fmt.Sprintf("   • %s: %s\n", ex, valErr.SDKValidationErr)
-						}
-						for field, reason := range valErr.InvalidFields {
-							msg += fmt.Sprintf("   • %s.%s: %s\n", ex, field, reason)
-						}
-					}
-				}
-			}
-
-			return errors.New(msg)
-		}
-
-		return fmt.Errorf("failed to validate connectors: %w", err)
-	}
-	return nil
-}
-
 // ExecuteStrategy runs the selected strategy with all its configured exchanges
-func (s *liveService) ExecuteStrategy(ctx context.Context, strat *config.Strategy, connector *config.Connector) error {
+func (s *liveService) ExecuteStrategy(ctx context.Context, strat *config.Strategy) error {
 	// 1. Pre-validate that we have connectors for this strategy's exchanges
 	connectorConfigs, err := s.connectorService.GetConnectorConfigsForStrategy(strat.Exchanges)
 	if err != nil {
