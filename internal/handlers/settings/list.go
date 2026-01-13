@@ -7,6 +7,7 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/router"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
+	"github.com/backtesting-org/live-trading/pkg/connectors/types"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/donderom/bubblon"
@@ -56,7 +57,7 @@ func (m *ConnectorListModel) Init() tea.Cmd {
 	m.configured = connectorList
 
 	// Get available connectors from SDK
-	allAvailable := m.connectorSvc.GetAvailableConnectorNames()
+	allAvailable := types.AllConnectors
 
 	// Filter out already configured ones
 	configuredMap := make(map[string]bool)
@@ -66,8 +67,8 @@ func (m *ConnectorListModel) Init() tea.Cmd {
 
 	m.available = []string{}
 	for _, name := range allAvailable {
-		if !configuredMap[name] {
-			m.available = append(m.available, name)
+		if !configuredMap[string(name)] {
+			m.available = append(m.available, string(name))
 		}
 	}
 

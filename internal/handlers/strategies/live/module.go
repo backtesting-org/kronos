@@ -5,14 +5,18 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/services/live/manager"
 	"github.com/backtesting-org/kronos-cli/internal/services/live/runtime"
 	"github.com/backtesting-org/kronos-cli/internal/services/monitoring"
-	"github.com/backtesting-org/live-trading/pkg"
+	"github.com/backtesting-org/kronos-sdk/kronos"
+	"github.com/backtesting-org/live-trading/pkg/connectors"
 	"go.uber.org/fx"
 )
 
 // Module provides all live trading dependencies including connectors registry and runtime
 var Module = fx.Module("live",
-	// Core SDK dependencies - provides connector registry
-	pkg.Module,
+	// Core SDK dependencies
+	kronos.Module,
+
+	// Live connectors
+	connectors.Module,
 
 	// Monitoring - ViewRegistry for exposing runtime data
 	monitoring.Module,

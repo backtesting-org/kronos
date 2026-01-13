@@ -9,23 +9,23 @@ import (
 	"github.com/backtesting-org/kronos-cli/pkg/live"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/logging"
-	"github.com/backtesting-org/live-trading/pkg/startup"
+	"github.com/backtesting-org/kronos-sdk/pkg/types/runtime"
 )
 
 type liveRuntime struct {
 	logger       logging.ApplicationLogger
-	startup      *startup.Startup
+	runtime      runtime.Runtime
 	configLoader config.StartupConfigLoader
 }
 
 func NewRuntime(
 	logger logging.ApplicationLogger,
-	startup *startup.Startup,
+	runtime runtime.Runtime,
 	configLoader config.StartupConfigLoader,
 ) live.Runtime {
 	return &liveRuntime{
 		logger:       logger,
-		startup:      startup,
+		runtime:      runtime,
 		configLoader: configLoader,
 	}
 }
@@ -39,7 +39,7 @@ func (r *liveRuntime) Run(strategyDir string) error {
 
 	r.logger.Info("Config loaded", "strategy", cfg.Strategy.Name)
 
-	err = r.startup.Start(strategyDir, kronosPath)
+	err = r.runtime.Start(strategyDir, kronosPath)
 	if err != nil {
 		return fmt.Errorf("failed to start: %w", err)
 	}
@@ -54,7 +54,7 @@ func (r *liveRuntime) Run(strategyDir string) error {
 	r.logger.Info("Received shutdown signal", "signal", sig)
 
 	r.logger.Info("Stopping strategy...")
-	if err := r.startup.Stop(); err != nil {
+	if err := r.runtime.Stop(); err != nil {
 		r.logger.Error("Failed to stop strategy", "error", err)
 	}
 
