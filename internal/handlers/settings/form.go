@@ -7,6 +7,7 @@ import (
 	"github.com/backtesting-org/kronos-cli/internal/router"
 	"github.com/backtesting-org/kronos-cli/internal/ui"
 	"github.com/backtesting-org/kronos-sdk/pkg/types/config"
+	"github.com/backtesting-org/live-trading/pkg/connectors/types"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -110,10 +111,10 @@ func (m *ConnectorFormModel) buildForm() *huh.Form {
 
 	// If no exchange name set, show selector (this should rarely happen)
 	if m.exchangeName == "" {
-		availableExchanges := m.connectorSvc.GetAvailableConnectorNames()
+		availableExchanges := types.AllConnectors
 		exchangeOptions := make([]huh.Option[string], len(availableExchanges))
 		for i, ex := range availableExchanges {
-			exchangeOptions[i] = huh.NewOption(ex, ex)
+			exchangeOptions[i] = huh.NewOption(string(ex), string(ex))
 		}
 
 		groups = append(groups, huh.NewGroup(
