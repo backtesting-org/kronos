@@ -3,8 +3,8 @@ module github.com/backtesting-org/kronos-cli
 go 1.24.2
 
 require (
-	github.com/backtesting-org/kronos-sdk v0.0.7-0.20260113013513-a15f2874bd92
-	github.com/backtesting-org/live-trading v0.0.0-20260113025041-fcf03536ca5b
+	github.com/backtesting-org/kronos-sdk v0.0.7
+	github.com/backtesting-org/live-trading v0.0.0-20260115064332-fa986a9bb185
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/charmbracelet/huh v0.6.0
 	github.com/charmbracelet/lipgloss v1.1.0
@@ -31,6 +31,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
+	github.com/antihax/optional v1.0.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
@@ -60,6 +61,7 @@ require (
 	github.com/ethereum/go-ethereum v1.16.7 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/gate/gateapi-go/v7 v7.2.8 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
